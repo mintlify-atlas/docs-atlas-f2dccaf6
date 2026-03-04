@@ -1,0 +1,99 @@
+{
+  "projectType": "infrastructure",
+  "projectName": "Enterprise SOC Architecture",
+  "projectDescription": "Comprehensive Security Operations Center architecture integrating Wazuh SIEM/XDR, Elastic Stack, Suricata IDS, TheHive, and SOAR automation for enterprise security monitoring and incident response.",
+  "theme": "aspen",
+  "primaryColor": "#3b87f9",
+  "lightColor": "#0e2444",
+  "darkColor": "#cad9fc",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "introduction",
+              "architecture-overview",
+              "design-principles"
+            ]
+          },
+          {
+            "group": "Architecture Components",
+            "pages": [
+              "components/detection-layer",
+              "components/siem-platform",
+              "components/log-aggregation",
+              "components/infrastructure-monitoring",
+              "components/incident-response",
+              "components/automation-soar"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "deployment/prerequisites",
+              "deployment/network-setup",
+              "deployment/component-installation",
+              "deployment/configuration"
+            ]
+          },
+          {
+            "group": "Operations",
+            "pages": [
+              "operations/monitoring-guide",
+              "operations/incident-handling",
+              "operations/threat-hunting",
+              "operations/maintenance"
+            ]
+          },
+          {
+            "group": "Security",
+            "pages": [
+              "security/threat-detection",
+              "security/best-practices",
+              "security/compliance"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Reference",
+        "groups": [
+          {
+            "group": "Resources",
+            "pages": [
+              "reference/technology-stack",
+              "reference/data-flow",
+              "reference/integrations",
+              "reference/roadmap",
+              "reference/glossary"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Multi-layered threat detection with Snort and Suricata IDS/IPS",
+    "Centralized SIEM/XDR platform powered by Wazuh",
+    "Elastic Stack for scalable log aggregation and analysis",
+    "Automated incident response with TheHive and Cortex SOAR",
+    "Infrastructure monitoring via Zabbix and Prometheus",
+    "Modular and scalable architecture design",
+    "Future integration with honeypots, OPNsense firewall, and Tailscale VPN"
+  ],
+  "publicApiSurface": [
+    "Wazuh SIEM/XDR Platform",
+    "Suricata IDS/IPS",
+    "Snort IDS",
+    "Elasticsearch",
+    "Logstash/Fluentd",
+    "TheHive Incident Management",
+    "Cortex SOAR",
+    "Zabbix Monitoring",
+    "Prometheus Metrics",
+    "Terraform/PyInfra Automation"
+  ]
+}

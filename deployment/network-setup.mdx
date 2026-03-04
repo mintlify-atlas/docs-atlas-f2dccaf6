@@ -1,0 +1,497 @@
+---
+title: Network Setup
+description: Network topology, segmentation, and traffic configuration for the Enterprise SOC Architecture
+---
+
+<Warning>
+This project is currently in the **design phase**. The network architecture described here is conceptual and should be adapted to your specific environment during implementation.
+</Warning>
+
+## Overview
+
+Proper network configuration is critical for SOC effectiveness and security. This guide covers network topology, segmentation, firewall rules, and traffic mirroring configuration for the Enterprise SOC Architecture.
+
+## Network Topology
+
+### Reference Architecture
+
+The SOC architecture requires multiple network segments for security and operational efficiency:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Production Network                        │
+│                   (Monitored Endpoints)                      │
+└────────────────┬────────────────────────────────────────────┘
+                 │
+                 │ Traffic Mirroring (SPAN/TAP)
+                 │
+┌────────────────▼────────────────────────────────────────────┐
+│              IDS/IPS Monitoring Segment                      │
+│           (Snort/Suricata - Read-only)                      │
+└────────────────┬────────────────────────────────────────────┘
+                 │
+                 │ Alert Forwarding
+                 │
+┌────────────────▼────────────────────────────────────────────┐
+│               SOC Management Network                         │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
+│  │ Wazuh    │  │ Elastic  │  │ Logstash │  │ TheHive  │   │
+│  │ Manager  │  │ Search   │  │ Pipeline │  │ + Cortex │   │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘   │
+│  ┌──────────┐  ┌──────────┐                                │
+│  │ Zabbix   │  │Prometheus│                                │
+│  └──────────┘  └──────────┘                                │
+└────────────────┬────────────────────────────────────────────┘
+                 │
+                 │ Restricted Access
+                 │
+┌────────────────▼────────────────────────────────────────────┐
+│            SOC Analyst Workstation Network                   │
+│              (Dashboard Access Only)                         │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│          Future: Honeypot Deception Network                  │
+│              (Isolated - Long-term Plan)                     │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Network Segmentation Strategy
+
+<Info>
+Network segmentation isolates SOC components, limits lateral movement, and protects sensitive security infrastructure.
+</Info>
+
+| Segment | Purpose | Security Level | Components |
+|---------|---------|----------------|------------|
+| **Production Network** | Normal business operations | Standard | Endpoints, servers, applications |
+| **IDS Monitoring** | Passive traffic analysis | High (read-only) | Snort, Suricata sensors |
+| **SOC Management** | Security platform core | Critical | Wazuh, Elasticsearch, TheHive, monitoring |
+| **SOC Admin/Analyst** | Dashboard and case access | High | Analyst workstations, web interfaces |
+| **Honeypot Network** (future) | Deception infrastructure | Isolated | Honeypot VMs, trap services |
+
+## VLAN Configuration
+
+### Recommended VLAN Design
+
+<Accordion title="VLAN 10: Production Network">
+  **Purpose**: Monitored endpoints and production systems
+  
+  - **Subnet**: 10.0.10.0/24 (example)
+  - **Default Gateway**: Firewall interface
+  - **DHCP**: Enabled for endpoints
+  - **Access**: Standard firewall rules
+  - **Traffic Mirroring**: Enabled to VLAN 20
+  
+  <Note>
+  This is your existing production network. The SOC monitors traffic from this segment but does not interfere with normal operations.
+  </Note>
+</Accordion>
+
+<Accordion title="VLAN 20: IDS/IPS Monitoring">
+  **Purpose**: Network intrusion detection sensors
+  
+  - **Subnet**: 10.0.20.0/24 (example)
+  - **Access Mode**: Monitor/promiscuous mode
+  - **Gateway**: Management interface only
+  - **Outbound**: Allowed only to SOC Management VLAN
+  - **Inbound**: No direct access (mirrored traffic only)
+  
+  **Special Configuration:**
+  - Configure switch port mirroring (SPAN) or network TAP
+  - IDS sensors receive copy of production traffic
+  - Sensors cannot send traffic back to production
+</Accordion>
+
+<Accordion title="VLAN 30: SOC Management">
+  **Purpose**: Core security platform components
+  
+  - **Subnet**: 10.0.30.0/24 (example)
+  - **Access**: Highly restricted, firewall enforced
+  - **Allowed Inbound**:
+    - Log data from production endpoints (Wazuh agents: 1514/tcp, 1515/tcp)
+    - Alerts from IDS sensors (varies by configuration)
+    - Monitoring data from Zabbix/Prometheus agents
+    - Management access from SOC Admin VLAN only
+  - **Allowed Outbound**:
+    - Internet access for threat intelligence feeds (restricted)
+    - Communication between SOC components
+  
+  <Warning>
+  This VLAN contains the most critical security infrastructure. Implement strict access controls and audit all connections.
+  </Warning>
+</Accordion>
+
+<Accordion title="VLAN 40: SOC Analyst/Admin">
+  **Purpose**: Security analyst workstations and dashboard access
+  
+  - **Subnet**: 10.0.40.0/24 (example)
+  - **Access**: Authenticated users only (802.1X recommended)
+  - **Allowed Outbound**:
+    - HTTPS to Wazuh dashboards (443/tcp)
+    - HTTPS to TheHive interface (9000/tcp)
+    - SSH to management interfaces (22/tcp, restricted by IP)
+    - HTTPS to Zabbix/Prometheus dashboards
+  - **Allowed Inbound**: None (workstations initiate connections)
+  
+  <Info>
+  Consider implementing multi-factor authentication (MFA) for all access to this segment.
+  </Info>
+</Accordion>
+
+<Accordion title="VLAN 50: Honeypot Network (Future)">
+  **Purpose**: Deception infrastructure for threat research
+  
+  - **Subnet**: 192.168.50.0/24 (isolated range)
+  - **Isolation**: Completely isolated from production
+  - **Routing**: No direct route to production VLANs
+  - **Monitoring**: All traffic logged and forwarded to SOC
+  - **Status**: Long-term planning phase
+  
+  <Warning>
+  Honeypot networks must be completely isolated from production. All traffic should be logged for analysis but never allowed to reach production systems.
+  </Warning>
+</Accordion>
+
+## Firewall Rules and Port Requirements
+
+### Inter-Component Communication Matrix
+
+<Note>
+The following table defines required firewall rules between SOC components. Implement these as allowlist rules (deny all, permit specific).
+</Note>
+
+| Source | Destination | Port/Protocol | Purpose |
+|--------|-------------|---------------|----------|
+| Production Endpoints | Wazuh Manager (VLAN 30) | 1514/tcp, 1515/tcp | Agent enrollment and event reporting |
+| Production Endpoints | Logstash (VLAN 30) | 5044/tcp | Beats log forwarding |
+| Production Servers | Zabbix Server (VLAN 30) | 10051/tcp | Monitoring data |
+| Production Servers | Prometheus (VLAN 30) | Various | Metrics exporters |
+| IDS Sensors (VLAN 20) | Logstash (VLAN 30) | 5044/tcp | Alert forwarding |
+| IDS Sensors (VLAN 20) | Wazuh Manager (VLAN 30) | 1514/tcp | Alert integration |
+| Logstash (VLAN 30) | Elasticsearch (VLAN 30) | 9200/tcp | Data indexing |
+| Wazuh Manager (VLAN 30) | Elasticsearch (VLAN 30) | 9200/tcp | Event storage |
+| TheHive (VLAN 30) | Elasticsearch (VLAN 30) | 9200/tcp | Case data storage |
+| Cortex (VLAN 30) | TheHive (VLAN 30) | 9000/tcp | SOAR integration |
+| Elasticsearch Nodes (VLAN 30) | Other Elasticsearch Nodes | 9300/tcp | Cluster communication |
+| SOC Analysts (VLAN 40) | Wazuh Dashboard (VLAN 30) | 443/tcp | HTTPS web interface |
+| SOC Analysts (VLAN 40) | TheHive (VLAN 30) | 9000/tcp | Case management UI |
+| SOC Analysts (VLAN 40) | Zabbix Frontend (VLAN 30) | 443/tcp | Infrastructure monitoring |
+| SOC Analysts (VLAN 40) | Prometheus/Grafana (VLAN 30) | 3000/tcp, 9090/tcp | Metrics dashboards |
+| SOC Management (VLAN 30) | Internet | 443/tcp | Threat intel feeds, updates |
+| SOC Admins (VLAN 40) | All SOC Components (VLAN 30) | 22/tcp | SSH management access |
+
+### Firewall Rule Templates
+
+<CodeGroup>
+```bash iptables (Example)
+# Allow Wazuh agent connections from production
+iptables -A INPUT -s 10.0.10.0/24 -d 10.0.30.10 -p tcp --dport 1514 -j ACCEPT
+iptables -A INPUT -s 10.0.10.0/24 -d 10.0.30.10 -p tcp --dport 1515 -j ACCEPT
+
+# Allow IDS sensors to forward to Logstash
+iptables -A FORWARD -s 10.0.20.0/24 -d 10.0.30.20 -p tcp --dport 5044 -j ACCEPT
+
+# Allow SOC analysts to access Wazuh dashboard
+iptables -A FORWARD -s 10.0.40.0/24 -d 10.0.30.10 -p tcp --dport 443 -j ACCEPT
+
+# Allow Elasticsearch cluster communication
+iptables -A INPUT -s 10.0.30.0/24 -d 10.0.30.0/24 -p tcp --dport 9300 -j ACCEPT
+
+# Default deny
+iptables -A INPUT -j DROP
+iptables -A FORWARD -j DROP
+```
+
+```text pfSense/OPNsense (Future)
+# When implementing OPNsense firewall (long-term plan)
+# Create firewall rules in web interface:
+
+# Production → SOC Management
+Action: Pass
+Interface: VLAN10
+Protocol: TCP
+Source: VLAN10 net
+Destination: VLAN30 address (Wazuh)
+Destination Port: 1514-1515
+
+# IDS → SOC Management  
+Action: Pass
+Interface: VLAN20
+Protocol: TCP
+Source: VLAN20 net
+Destination: VLAN30 address (Logstash)
+Destination Port: 5044
+
+# Block all other inter-VLAN traffic by default
+```
+</CodeGroup>
+
+### Port Reference by Component
+
+<Accordion title="Wazuh">
+  - **1514/tcp**: Agent event reporting (secure)
+  - **1515/tcp**: Agent enrollment
+  - **443/tcp**: Dashboard web interface (HTTPS)
+  - **55000/tcp**: Wazuh API (restrict to authorized systems)
+</Accordion>
+
+<Accordion title="Elasticsearch">
+  - **9200/tcp**: HTTP API (REST interface)
+  - **9300/tcp**: Transport protocol (cluster communication)
+  
+  <Warning>
+  Never expose Elasticsearch port 9200 directly to the internet. Use reverse proxy with authentication.
+  </Warning>
+</Accordion>
+
+<Accordion title="Logstash/Fluentd">
+  - **5044/tcp**: Beats input (Filebeat, Metricbeat)
+  - **5140/tcp**: Syslog input (optional)
+  - **9600/tcp**: Monitoring API
+</Accordion>
+
+<Accordion title="TheHive + Cortex">
+  - **9000/tcp**: TheHive web interface
+  - **9001/tcp**: Cortex API
+  - **9999/tcp**: Cassandra (if used as backend)
+</Accordion>
+
+<Accordion title="Monitoring Systems">
+  - **10051/tcp**: Zabbix trapper
+  - **10050/tcp**: Zabbix agent (on monitored hosts)
+  - **9090/tcp**: Prometheus server
+  - **3000/tcp**: Grafana dashboard (often paired with Prometheus)
+</Accordion>
+
+<Accordion title="IDS/IPS">
+  - **No inbound ports** (passive monitoring)
+  - Outbound: Varies based on log forwarding configuration
+</Accordion>
+
+## Traffic Mirroring Configuration
+
+### Overview
+
+<Info>
+IDS/IPS systems require a copy of network traffic to analyze. This is achieved through port mirroring (SPAN) or physical network TAPs.
+</Info>
+
+### Port Mirroring (SPAN) Configuration
+
+<Steps>
+  <Step title="Identify Traffic to Monitor">
+    Determine which network segments and switch ports should be monitored:
+    - Uplink ports (internet gateway)
+    - Critical server VLANs
+    - Endpoint access layer switches
+    - Inter-datacenter links (if applicable)
+  </Step>
+  
+  <Step title="Configure Mirror Session">
+    Create a SPAN/mirror session on your switch directing traffic to IDS sensor port.
+  </Step>
+  
+  <Step title="Validate Traffic Flow">
+    Verify the IDS sensor receives mirrored traffic without packet loss.
+  </Step>
+  
+  <Step title="Optimize for Scale">
+    For high-traffic environments, consider RSPAN (Remote SPAN) or ERSPAN (Encapsulated Remote SPAN).
+  </Step>
+</Steps>
+
+### Switch Configuration Examples
+
+<CodeGroup>
+```cisco Cisco IOS SPAN
+! Local SPAN configuration
+! Mirror traffic from VLAN 10 to monitoring port
+
+monitor session 1 source vlan 10
+monitor session 1 destination interface GigabitEthernet0/24
+
+! Verify configuration
+show monitor session 1
+```
+
+```text Cisco IOS RSPAN
+! Remote SPAN for distributed monitoring
+! Create RSPAN VLAN
+vlan 999
+  name RSPAN_VLAN
+  remote-span
+
+! Source switch configuration
+monitor session 1 source vlan 10
+monitor session 1 destination remote vlan 999
+
+! Destination switch configuration  
+monitor session 2 source remote vlan 999
+monitor session 2 destination interface GigabitEthernet0/24
+```
+
+```text Aruba/HPE ProCurve
+! Port mirroring configuration
+mirror-port 24
+vlan 10
+  mirror 24
+
+! Show configuration
+show monitor
+```
+</CodeGroup>
+
+### Network TAP Alternative
+
+<Note>
+**Physical Network TAPs** provide advantages over SPAN:
+- No packet loss (dedicated hardware)
+- No impact on switch performance
+- Guaranteed full-duplex traffic capture
+- Better for high-throughput networks (>1 Gbps)
+
+**Considerations:**
+- Requires physical installation in network path
+- Additional hardware cost
+- Recommended for critical monitoring points
+</Note>
+
+### Traffic Filtering and Optimization
+
+<Warning>
+In high-traffic environments, consider filtering mirrored traffic to reduce load on IDS:
+- Filter by VLAN (only monitor specific segments)
+- Filter by direction (ingress vs egress)
+- Use hardware ACLs to exclude non-essential traffic (e.g., legitimate internal backups)
+- Deploy multiple IDS sensors for load distribution
+</Warning>
+
+## Network Performance Considerations
+
+### Bandwidth Planning
+
+| Scenario | Recommended Action |
+|----------|-------------------|
+| Network throughput < 1 Gbps | Single IDS instance with SPAN |
+| Network throughput 1-5 Gbps | Multiple IDS instances or high-performance sensor |
+| Network throughput > 5 Gbps | Dedicated IDS appliances, load balancing, or selective filtering |
+| Multi-site deployment | RSPAN/ERSPAN or distributed sensors with centralized management |
+
+### Latency Sensitivity
+
+<Info>
+SOC components tolerance for network latency:
+- **High tolerance** (greater than 100ms OK): Log aggregation, long-term storage
+- **Medium tolerance** (10-100ms): Real-time dashboards, agent reporting  
+- **Low tolerance** (less than 10ms): Elasticsearch cluster communication, high-frequency metrics
+
+Place latency-sensitive components on the same network segment or use high-speed interconnects.
+</Info>
+
+## Security Best Practices
+
+<Steps>
+  <Step title="Implement Zero Trust">
+    - Default deny all traffic between VLANs
+    - Explicitly allow only required connections
+    - Use firewall rules for all inter-segment communication
+  </Step>
+  
+  <Step title="Encrypt Management Traffic">
+    - Use TLS/SSL for all web interfaces
+    - Implement SSH for command-line access (disable Telnet)
+    - Consider VPN for remote SOC analyst access
+  </Step>
+  
+  <Step title="Separate Management Interfaces">
+    - Use dedicated NICs for management on critical systems
+    - Place management interfaces on separate VLAN (out-of-band management)
+    - Restrict management access by source IP
+  </Step>
+  
+  <Step title="Monitor the Monitors">
+    - Enable logging on firewall rules protecting SOC infrastructure
+    - Alert on unauthorized access attempts to SOC Management VLAN
+    - Implement integrity monitoring on SOC systems themselves
+  </Step>
+  
+  <Step title="Plan for Incident Response">
+    - Document network isolation procedures
+    - Prepare firewall rules for emergency containment
+    - Establish out-of-band communication for security team
+  </Step>
+</Steps>
+
+## Future Network Enhancements
+
+### Long-Term Planning Components
+
+<Accordion title="OPNsense Firewall Integration">
+  **Status**: Long-term plan
+  
+  **Benefits**:
+  - Centralized firewall management for all SOC VLANs
+  - Advanced traffic shaping and QoS
+  - Integrated IDS/IPS (Suricata) at firewall level
+  - Web filtering and application control
+  
+  **Network Impact**:
+  - Deploy as gateway between major network segments
+  - Route all inter-VLAN traffic through OPNsense
+  - Implement high availability (HA) pair for redundancy
+</Accordion>
+
+<Accordion title="Tailscale VPN for Remote Access">
+  **Status**: Long-term plan
+  
+  **Use Case**:
+  - Secure remote access for SOC analysts
+  - Mesh VPN for distributed SOC components
+  - Zero-trust network access (ZTNA)
+  
+  **Network Configuration**:
+  - Deploy Tailscale subnet router in SOC Admin VLAN
+  - Advertise SOC Management subnet (10.0.30.0/24) to mesh
+  - Implement ACLs in Tailscale admin console
+  - MFA required for all VPN connections
+</Accordion>
+
+<Accordion title="Honeypot Network Isolation">
+  **Status**: Long-term plan
+  
+  **Architecture**:
+  - Completely isolated VLAN (no routing to production)
+  - One-way traffic flow: honeypot → SOC logging only
+  - Virtualized on Proxmox with network isolation enforced at hypervisor
+  - External IP addresses or NAT to appear as separate infrastructure
+  
+  <Warning>
+  Honeypots attract attacks by design. Isolation is critical to prevent attackers from pivoting to production systems.
+  </Warning>
+</Accordion>
+
+## Network Topology Validation
+
+Before proceeding with deployment:
+
+- [ ] VLANs created and configured on all switches
+- [ ] Firewall rules documented and tested
+- [ ] Port mirroring/SPAN verified and traffic confirmed at IDS sensor
+- [ ] Inter-component connectivity tested (can each component reach required destinations?)
+- [ ] Management access restricted and tested
+- [ ] Network bandwidth sufficient for anticipated log volume
+- [ ] Network diagrams documented and approved
+- [ ] Emergency isolation procedures documented
+
+## Next Steps
+
+With network infrastructure configured:
+
+1. Proceed to [Component Installation](/deployment/component-installation)
+2. Review [Configuration](/deployment/configuration) requirements for network-related settings
+3. Test connectivity between components before deploying to production
+
+<Info>
+Network configuration is foundational to SOC operations. Take time to thoroughly test and document before proceeding with component deployment.
+</Info>

@@ -1,0 +1,405 @@
+---
+title: "Monitoring Guide"
+description: "Comprehensive guide for SOC monitoring operations, dashboard setup, and alert management"
+---
+
+# Monitoring Guide
+
+This guide covers the daily monitoring operations for the Enterprise SOC, including dashboard configuration, key metrics, alert management, and event correlation workflows.
+
+## Dashboard Setup
+
+<CardGroup cols={2}>
+  <Card title="Wazuh Dashboards" icon="shield-halved">
+    Central security event visualization and correlation platform for unified threat monitoring
+  </Card>
+  <Card title="Prometheus Metrics" icon="chart-line">
+    Real-time metrics and alerting for infrastructure performance and availability
+  </Card>
+  <Card title="Elasticsearch Analytics" icon="magnifying-glass-chart">
+    Deep log analysis and search capabilities for forensic investigation
+  </Card>
+  <Card title="Zabbix Infrastructure" icon="server">
+    Infrastructure health monitoring and availability tracking
+  </Card>
+</CardGroup>
+
+### Wazuh Security Dashboard
+
+The Wazuh platform serves as the central hub for security event visualization:
+
+<Steps>
+  <Step title="Access the Wazuh Dashboard">
+    Navigate to the Wazuh web interface and authenticate with your SOC credentials
+  </Step>
+  <Step title="Configure Security Overview">
+    Enable key panels:
+    - Security events summary
+    - Top triggered rules
+    - Alert evolution over time
+    - Agent status overview
+  </Step>
+  <Step title="Set Up Custom Views">
+    Create role-based dashboards for:
+    - Tier 1 Analysts (high-priority alerts)
+    - Tier 2 Analysts (investigation workflows)
+    - SOC Manager (metrics and KPIs)
+  </Step>
+  <Step title="Enable Real-Time Monitoring">
+    Configure auto-refresh intervals (recommended: 30-60 seconds for active monitoring)
+  </Step>
+</Steps>
+
+### Infrastructure Monitoring
+
+<Info>
+Combine Zabbix and Prometheus for comprehensive infrastructure visibility. Zabbix excels at availability monitoring while Prometheus provides detailed metrics and alerting.
+</Info>
+
+**Key Zabbix Dashboards:**
+- Network device availability
+- Server health (CPU, memory, disk)
+- Service status monitoring
+- Database performance
+
+**Key Prometheus Dashboards:**
+- Container metrics (if using containerized deployments)
+- Application performance metrics
+- Custom security metrics
+- Resource utilization trends
+
+## Key Metrics to Monitor
+
+### Security Metrics
+
+<Accordion title="Critical Security Events">
+  - **Failed Authentication Attempts**: Monitor for brute force attacks
+  - **Privilege Escalation**: Track sudo usage and administrative actions
+  - **File Integrity Violations**: Critical system file modifications
+  - **Malware Detection**: EDR alerts from Wazuh agents
+  - **Network Intrusions**: IDS/IPS alerts from Snort and Suricata
+</Accordion>
+
+<Accordion title="Network Security">
+  - **IDS/IPS Alert Volume**: Track Snort and Suricata detection rates
+  - **Blocked Connections**: Firewall deny logs
+  - **Unusual Traffic Patterns**: Port scans, DDoS indicators
+  - **External Communications**: Unexpected outbound connections
+  - **DNS Anomalies**: DNS tunneling, DGA detection
+</Accordion>
+
+<Accordion title="Endpoint Security">
+  - **Agent Health**: Wazuh agent connectivity status
+  - **EDR Detections**: Endpoint threats and suspicious behavior
+  - **Vulnerability Status**: Unpatched systems count
+  - **Configuration Compliance**: Policy violations
+  - **Process Anomalies**: Unusual process execution
+</Accordion>
+
+<Accordion title="Performance Metrics">
+  - **Log Ingestion Rate**: Events per second in Logstash/Fluentd
+  - **Elasticsearch Cluster Health**: Index status and performance
+  - **Query Response Time**: Dashboard load times
+  - **Storage Utilization**: Log retention capacity
+  - **Processing Lag**: Pipeline delays
+</Accordion>
+
+## Alert Configuration and Tuning
+
+### Alert Levels
+
+The SOC uses a tiered alert severity system:
+
+| Severity | Level | Response Time | Examples |
+|----------|-------|---------------|----------|
+| **Critical** | 12-15 | Immediate | Active exploitation, data exfiltration |
+| **High** | 9-11 | < 15 minutes | Malware detection, privilege escalation |
+| **Medium** | 6-8 | < 1 hour | Policy violations, suspicious activity |
+| **Low** | 3-5 | < 4 hours | Information events, minor anomalies |
+| **Informational** | 0-2 | Daily review | Audit logs, routine events |
+
+### Wazuh Alert Configuration
+
+<Steps>
+  <Step title="Review Default Rules">
+    Examine Wazuh default ruleset and identify relevant rules for your environment
+  </Step>
+  <Step title="Create Custom Rules">
+    Develop organization-specific rules in `/var/ossec/etc/rules/local_rules.xml`
+  </Step>
+  <Step title="Set Severity Thresholds">
+    Configure alert levels based on business impact and threat severity
+  </Step>
+  <Step title="Configure Alert Destinations">
+    Set up integrations:
+    - TheHive for incident creation
+    - Email notifications for critical alerts
+    - Slack/Teams for team notifications
+  </Step>
+  <Step title="Enable Alert Grouping">
+    Configure correlation to reduce alert fatigue and group related events
+  </Step>
+</Steps>
+
+<Warning>
+Avoid alert fatigue by tuning false positives aggressively. A high-noise environment leads to missed critical alerts.
+</Warning>
+
+### IDS/IPS Alert Tuning
+
+**Snort and Suricata Configuration:**
+
+<Tip>
+Start with conservative rulesets and gradually enable more aggressive detection rules as you tune false positives.
+</Tip>
+
+1. **Enable Community Rules**: Start with Emerging Threats or Snort Community rules
+2. **Suppress False Positives**: Create suppression lists for known benign traffic
+3. **Custom Signatures**: Develop environment-specific detection rules
+4. **Threshold Configuration**: Set event thresholds to detect scanning and brute force
+5. **Regular Updates**: Schedule weekly rule updates from threat intelligence feeds
+
+### Prometheus Alerting Rules
+
+Configure alerting rules in Prometheus for infrastructure issues:
+
+```yaml
+groups:
+  - name: soc_infrastructure
+    interval: 30s
+    rules:
+      - alert: HighCPUUsage
+        expr: node_cpu_usage > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage detected"
+      
+      - alert: LogPipelineDown
+        expr: up{job="logstash"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Log pipeline is down"
+```
+
+## Event Correlation Workflows
+
+### Multi-Source Correlation
+
+Wazuh provides powerful event correlation capabilities to detect complex attack patterns:
+
+<Steps>
+  <Step title="Identify Correlation Patterns">
+    Define attack scenarios requiring multiple events:
+    - Reconnaissance → Exploitation → Lateral Movement
+    - Failed Login → Successful Login → Data Access
+    - Port Scan → Vulnerability Exploit → Malware Execution
+  </Step>
+  <Step title="Configure Correlation Rules">
+    Create correlation rules in Wazuh:
+    ```xml
+    <rule id="100001" level="12">
+      <if_matched_sid>5710</if_matched_sid>
+      <same_source_ip />
+      <description>Multiple failed logins followed by success</description>
+    </rule>
+    ```
+  </Step>
+  <Step title="Integrate Multiple Sources">
+    Correlate events from:
+    - IDS/IPS alerts (Snort/Suricata)
+    - Firewall logs
+    - Endpoint EDR events
+    - Authentication logs
+    - Network flow data
+  </Step>
+  <Step title="Enrich with Context">
+    Add threat intelligence and asset context to correlation events
+  </Step>
+  <Step title="Automate Response">
+    Configure automatic incident creation in TheHive for correlated high-severity events
+  </Step>
+</Steps>
+
+### Elasticsearch Query Correlation
+
+Use Elasticsearch for advanced correlation queries:
+
+<Note>
+Elasticsearch Query DSL enables complex temporal and cross-index correlations that complement Wazuh rule-based detection.
+</Note>
+
+**Example: Detect Lateral Movement**
+```json
+{
+  "query": {
+    "bool": {
+      "must": [
+        {"match": {"event.type": "authentication"}},
+        {"match": {"event.outcome": "success"}},
+        {"range": {"@timestamp": {"gte": "now-1h"}}}
+      ],
+      "filter": {
+        "script": {
+          "script": "doc['source.ip'].value != doc['destination.ip'].value"
+        }
+      }
+    }
+  },
+  "aggs": {
+    "by_user": {
+      "terms": {"field": "user.name"},
+      "aggs": {
+        "unique_hosts": {"cardinality": {"field": "destination.ip"}}
+      }
+    }
+  }
+}
+```
+
+## Daily Monitoring Checklist
+
+<Steps>
+  <Step title="Start of Shift (0-15 minutes)">
+    - [ ] Review overnight critical and high alerts
+    - [ ] Check all monitoring systems are operational (Wazuh, Prometheus, Zabbix, Elasticsearch)
+    - [ ] Verify agent connectivity (check for disconnected endpoints)
+    - [ ] Review pending incidents in TheHive
+    - [ ] Check log ingestion rates and pipeline health
+  </Step>
+  
+  <Step title="Morning Review (15-60 minutes)">
+    - [ ] Analyze security event trends from past 24 hours
+    - [ ] Review IDS/IPS alerts (Snort/Suricata) for new attack patterns
+    - [ ] Check for failed authentication spikes
+    - [ ] Review file integrity monitoring alerts
+    - [ ] Investigate medium-severity alerts
+    - [ ] Update threat hunting queries based on new intelligence
+  </Step>
+  
+  <Step title="Midday Operations (As needed)">
+    - [ ] Respond to real-time alerts as they arrive
+    - [ ] Perform proactive threat hunting (see Threat Hunting guide)
+    - [ ] Tune false positive alerts
+    - [ ] Collaborate on active investigations
+    - [ ] Review and update correlation rules
+  </Step>
+  
+  <Step title="Afternoon Review (30 minutes)">
+    - [ ] Check compliance dashboard for policy violations
+    - [ ] Review vulnerability scan results
+    - [ ] Update incident tickets in TheHive
+    - [ ] Document findings and IOCs
+    - [ ] Review infrastructure metrics for anomalies
+  </Step>
+  
+  <Step title="End of Shift (15-30 minutes)">
+    - [ ] Review all alerts handled during shift
+    - [ ] Update shift handover notes
+    - [ ] Escalate unresolved issues to next shift or Tier 2
+    - [ ] Check for any pending actions in TheHive
+    - [ ] Verify critical systems are healthy for next shift
+    - [ ] Brief incoming analyst on current situation
+  </Step>
+</Steps>
+
+<Warning>
+Never end a shift with unacknowledged critical alerts. Always ensure proper handover or escalation.
+</Warning>
+
+## Best Practices
+
+### Monitoring Hygiene
+
+<Tip>
+Maintain a clean monitoring environment to ensure analysts can quickly identify genuine threats.
+</Tip>
+
+1. **Tune Aggressively**: Dedicate time weekly to reduce false positives
+2. **Document Everything**: Maintain runbooks for common alert types
+3. **Baseline Normal**: Understand normal behavior to identify anomalies
+4. **Regular Reviews**: Weekly review of alert effectiveness and coverage
+5. **Continuous Learning**: Stay updated on new attack techniques and adjust monitoring
+
+### Alert Response Priorities
+
+1. **Active Exploitation** - Drop everything and respond
+2. **Data Exfiltration** - Immediate containment required
+3. **Malware Execution** - Isolate and investigate
+4. **Privilege Escalation** - Verify legitimacy immediately
+5. **Failed Authentication Patterns** - Monitor for escalation
+
+### Communication Protocols
+
+<Info>
+Clear communication during security events is critical for effective response.
+</Info>
+
+- **Critical Alerts**: Immediately notify SOC lead and affected asset owners
+- **Incidents**: Create TheHive case and notify stakeholders
+- **Ongoing Investigations**: Regular updates every 2-4 hours
+- **False Positives**: Document in knowledge base to prevent future confusion
+- **Shift Handover**: Detailed written summary plus verbal briefing
+
+## Performance Optimization
+
+### Dashboard Performance
+
+- Limit time ranges for heavy queries (default: last 24 hours)
+- Use Elasticsearch aggregations instead of raw queries
+- Schedule resource-intensive reports during off-peak hours
+- Archive old indices to separate clusters if necessary
+
+### Query Optimization
+
+<Note>
+Slow queries impact monitoring effectiveness. Optimize queries to return results in under 3 seconds.
+</Note>
+
+- Use index patterns efficiently
+- Filter at query time rather than post-processing
+- Leverage Elasticsearch field caching
+- Use time-based indices for log data
+
+## Troubleshooting Common Issues
+
+### High Alert Volume
+
+**Symptoms**: Overwhelming number of alerts, analyst burnout
+
+**Solutions**:
+- Identify top noise generators using alert frequency analysis
+- Implement alert grouping and deduplication
+- Adjust severity levels for low-impact events
+- Create suppression rules for known false positives
+
+### Missing Events
+
+**Symptoms**: Expected events not appearing in dashboards
+
+**Solutions**:
+- Check agent connectivity in Wazuh
+- Verify Logstash/Fluentd pipeline processing
+- Review Elasticsearch index health
+- Check log source configuration
+- Verify firewall rules allow log transmission
+
+### Dashboard Slowness
+
+**Symptoms**: Queries taking > 10 seconds, timeouts
+
+**Solutions**:
+- Reduce query time range
+- Check Elasticsearch cluster health
+- Review index optimization status
+- Increase cluster resources if needed
+- Implement query result caching
+
+## Related Resources
+
+- [Incident Handling](/operations/incident-handling) - Procedures for responding to security incidents
+- [Threat Hunting](/operations/threat-hunting) - Proactive threat detection techniques
+- [Maintenance](/operations/maintenance) - System maintenance and tuning procedures

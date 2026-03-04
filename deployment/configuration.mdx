@@ -1,0 +1,1096 @@
+---
+title: Configuration
+description: Initial configuration, integration setup, and data flow configuration for all SOC components
+---
+
+<Warning>
+This project is currently in the **design phase**. The configurations described here are planning guidelines based on the conceptual architecture. Actual configuration details will be finalized during implementation.
+</Warning>
+
+## Overview
+
+After installing SOC components, proper configuration is essential for effective security operations. This guide covers initial configuration, integration points, data flow setup, and log forwarding rules.
+
+## Configuration Philosophy
+
+<Info>
+**Infrastructure as Code**: All configurations should be version-controlled and repeatable. Use configuration management tools (Ansible, Terraform, PyInfra) to maintain consistency across environments.
+</Info>
+
+### Configuration Priorities
+
+1. **Security first**: Enable encryption, authentication, and authorization
+2. **Integration**: Ensure components communicate correctly
+3. **Performance**: Optimize for expected load and scale
+4. **Observability**: Configure logging and monitoring of SOC itself
+5. **Maintainability**: Document all custom configurations
+
+## Component Configuration
+
+<Accordion title="Elasticsearch Configuration">
+  ### Core Configuration
+  
+  **File**: `/etc/elasticsearch/elasticsearch.yml`
+  
+  ```yaml
+  # Cluster configuration
+  cluster.name: soc-elasticsearch-cluster
+  node.name: es-node-01
+  
+  # Network settings
+  network.host: 10.0.30.11
+  http.port: 9200
+  transport.port: 9300
+  
+  # Discovery and cluster formation
+  discovery.seed_hosts:
+    - 10.0.30.11
+    - 10.0.30.12
+    - 10.0.30.13
+  
+  cluster.initial_master_nodes:
+    - es-node-01
+    - es-node-02
+    - es-node-03
+  
+  # Data and logs paths
+  path.data: /var/lib/elasticsearch
+  path.logs: /var/log/elasticsearch
+  
+  # Memory and performance
+  bootstrap.memory_lock: true
+  
+  # Security (X-Pack)
+  xpack.security.enabled: true
+  xpack.security.transport.ssl.enabled: true
+  xpack.security.transport.ssl.verification_mode: certificate
+  xpack.security.transport.ssl.keystore.path: certs/elastic-certificates.p12
+  xpack.security.transport.ssl.truststore.path: certs/elastic-certificates.p12
+  
+  # HTTP SSL (recommended for production)
+  xpack.security.http.ssl.enabled: true
+  xpack.security.http.ssl.keystore.path: certs/http.p12
+  
+  # Index lifecycle management
+  xpack.ilm.enabled: true
+  ```
+  
+  ### JVM Heap Configuration
+  
+  **File**: `/etc/elasticsearch/jvm.options`
+  
+  ```properties
+  # Set heap size to 50% of available RAM (max 31GB)
+  # For a 64GB system:
+  -Xms31g
+  -Xmx31g
+  
+  # For a 16GB system:
+  # -Xms8g
+  # -Xmx8g
+  ```
+  
+  ### Index Templates for SOC Data
+  
+  Create index templates for different log types:
+  
+  ```bash
+  # Wazuh alerts index template
+  curl -X PUT "https://localhost:9200/_index_template/wazuh-alerts" \
+    -H 'Content-Type: application/json' -d'
+  {
+    "index_patterns": ["wazuh-alerts-*"],
+    "template": {
+      "settings": {
+        "number_of_shards": 3,
+        "number_of_replicas": 1,
+        "index.lifecycle.name": "wazuh-policy",
+        "index.lifecycle.rollover_alias": "wazuh-alerts"
+      },
+      "mappings": {
+        "properties": {
+          "@timestamp": {"type": "date"},
+          "agent": {"type": "object"},
+          "rule": {"type": "object"},
+          "data": {"type": "object"}
+        }
+      }
+    }
+  }'
+  ```
+  
+  ### Index Lifecycle Policy
+  
+  Manage index retention and performance:
+  
+  ```json
+  {
+    "policy": {
+      "phases": {
+        "hot": {
+          "actions": {
+            "rollover": {
+              "max_size": "50GB",
+              "max_age": "1d"
+            }
+          }
+        },
+        "warm": {
+          "min_age": "7d",
+          "actions": {
+            "shrink": {"number_of_shards": 1},
+            "forcemerge": {"max_num_segments": 1}
+          }
+        },
+        "delete": {
+          "min_age": "90d",
+          "actions": {
+            "delete": {}
+          }
+        }
+      }
+    }
+  }
+  ```
+  
+  <Note>
+  Adjust retention periods based on compliance requirements and storage capacity. Common retention: 90 days hot/warm, up to 7 years archived.
+  </Note>
+</Accordion>
+
+<Accordion title="Wazuh Manager Configuration">
+  ### Main Configuration
+  
+  **File**: `/var/ossec/etc/ossec.conf`
+  
+  ```xml
+  <ossec_config>
+    <!-- Global settings -->
+    <global>
+      <email_notification>yes</email_notification>
+      <smtp_server>smtp.example.com</smtp_server>
+      <email_from>wazuh@soc.example.com</email_from>
+      <email_to>security-team@example.com</email_to>
+    </global>
+    
+    <!-- Alerts configuration -->
+    <alerts>
+      <log_alert_level>3</log_alert_level>
+      <email_alert_level>10</email_alert_level>
+    </alerts>
+    
+    <!-- Remote connection for agents -->
+    <remote>
+      <connection>secure</connection>
+      <port>1514</port>
+      <protocol>tcp</protocol>
+      <queue_size>131072</queue_size>
+    </remote>
+    
+    <!-- Cluster configuration (for HA) -->
+    <cluster>
+      <name>wazuh-cluster</name>
+      <node_name>wazuh-master</node_name>
+      <node_type>master</node_type>
+      <key>c98b62a9b6169ac5f67dae55ae4a9088</key>
+      <port>1516</port>
+      <bind_addr>0.0.0.0</bind_addr>
+      <nodes>
+        <node>10.0.30.10</node>
+      </nodes>
+      <hidden>no</hidden>
+      <disabled>no</disabled>
+    </cluster>
+    
+    <!-- File integrity monitoring -->
+    <syscheck>
+      <disabled>no</disabled>
+      <frequency>43200</frequency>
+      <scan_on_start>yes</scan_on_start>
+      
+      <!-- Directories to monitor -->
+      <directories>/etc,/usr/bin,/usr/sbin</directories>
+      <directories>/home</directories>
+      
+      <!-- Ignore changes to specific files -->
+      <ignore>/etc/mtab</ignore>
+      <ignore>/etc/hosts.deny</ignore>
+    </syscheck>
+    
+    <!-- Rootkit detection -->
+    <rootcheck>
+      <disabled>no</disabled>
+      <check_files>yes</check_files>
+      <check_trojans>yes</check_trojans>
+      <check_dev>yes</check_dev>
+      <check_sys>yes</check_sys>
+    </rootcheck>
+    
+    <!-- Vulnerability detection -->
+    <vulnerability-detector>
+      <enabled>yes</enabled>
+      <interval>5m</interval>
+      <run_on_start>yes</run_on_start>
+      
+      <!-- Vulnerability feeds -->
+      <provider name="canonical">
+        <enabled>yes</enabled>
+        <update_interval>1h</update_interval>
+      </provider>
+    </vulnerability-detector>
+    
+    <!-- Integration with Elasticsearch -->
+    <integration>
+      <name>elasticsearch</name>
+      <hook_url>https://10.0.30.11:9200</hook_url>
+      <level>3</level>
+      <alert_format>json</alert_format>
+    </integration>
+    
+    <!-- Integration with TheHive -->
+    <integration>
+      <name>custom-thehive</name>
+      <hook_url>http://10.0.30.50:9000</hook_url>
+      <api_key>your_thehive_api_key</api_key>
+      <alert_format>json</alert_format>
+      <level>10</level>
+    </integration>
+  </ossec_config>
+  ```
+  
+  ### Agent Enrollment
+  
+  **On Wazuh Manager**:
+  ```bash
+  # Generate agent authentication key
+  sudo /var/ossec/bin/manage_agents
+  
+  # Or use API for automation
+  curl -k -X POST "https://10.0.30.10:55000/agents" \
+    -H "Authorization: Bearer $TOKEN" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "name": "webserver-01",
+      "ip": "10.0.10.100"
+    }'
+  ```
+  
+  **On Agent** (endpoint):
+  ```bash
+  # Install Wazuh agent
+  curl -s https://packages.wazuh.com/key/GPG-KEY-WAZUH | apt-key add -
+  echo "deb https://packages.wazuh.com/4.x/apt/ stable main" | \
+    tee /etc/apt/sources.list.d/wazuh.list
+  apt update && apt install wazuh-agent
+  
+  # Configure manager address
+  echo "WAZUH_MANAGER='10.0.30.10'" >> /etc/ossec-init.conf
+  
+  # Import authentication key
+  /var/ossec/bin/manage_agents -i <key>
+  
+  # Start agent
+  systemctl enable wazuh-agent
+  systemctl start wazuh-agent
+  ```
+  
+  ### Custom Detection Rules
+  
+  **File**: `/var/ossec/etc/rules/local_rules.xml`
+  
+  ```xml
+  <group name="local,syslog,">
+    <!-- Custom rule: Multiple failed SSH attempts -->
+    <rule id="100001" level="10">
+      <if_matched_sid>5716</if_matched_sid>
+      <same_source_ip />
+      <description>Multiple SSH authentication failures</description>
+      <group>authentication_failures,</group>
+    </rule>
+    
+    <!-- Custom rule: Suspicious web traffic -->
+    <rule id="100002" level="8">
+      <if_sid>31100</if_sid>
+      <url>/admin|/wp-admin|/phpmyadmin</url>
+      <description>Attempt to access admin panel</description>
+      <group>web,attack,</group>
+    </rule>
+  </group>
+  ```
+  
+  <Info>
+  Rule tuning is an ongoing process. Start with default rules and customize based on your environment to reduce false positives.
+  </Info>
+</Accordion>
+
+<Accordion title="Logstash Configuration">
+  ### Main Configuration
+  
+  **File**: `/etc/logstash/logstash.yml`
+  
+  ```yaml
+  # Node name
+  node.name: logstash-01
+  
+  # Data paths
+  path.data: /var/lib/logstash
+  path.logs: /var/log/logstash
+  
+  # Pipeline configuration
+  pipeline.workers: 4
+  pipeline.batch.size: 125
+  pipeline.batch.delay: 50
+  
+  # Persistent queue for reliability
+  queue.type: persisted
+  queue.max_bytes: 4gb
+  
+  # Monitoring
+  monitoring.enabled: true
+  monitoring.elasticsearch.hosts: ["https://10.0.30.11:9200"]
+  monitoring.elasticsearch.username: "logstash_system"
+  monitoring.elasticsearch.password: "password"
+  ```
+  
+  ### Pipeline Configuration
+  
+  **File**: `/etc/logstash/conf.d/soc-pipeline.conf`
+  
+  ```ruby
+  # Input: Receive logs from various sources
+  input {
+    # Beats (Filebeat, Metricbeat)
+    beats {
+      port => 5044
+      ssl => true
+      ssl_certificate => "/etc/logstash/certs/logstash.crt"
+      ssl_key => "/etc/logstash/certs/logstash.key"
+    }
+    
+    # Syslog from network devices
+    syslog {
+      port => 5140
+      type => "syslog"
+    }
+    
+    # IDS alerts from Suricata/Snort
+    file {
+      path => "/var/log/suricata/eve.json"
+      codec => json
+      type => "suricata"
+      tags => ["ids", "network"]
+    }
+  }
+  
+  # Filter: Parse and enrich logs
+  filter {
+    # Parse Suricata EVE JSON
+    if [type] == "suricata" {
+      # Already JSON, minimal processing
+      mutate {
+        add_field => { "[@metadata][target_index]" => "suricata-alerts" }
+      }
+    }
+    
+    # Parse syslog
+    if [type] == "syslog" {
+      grok {
+        match => { "message" => "%{SYSLOGLINE}" }
+      }
+      date {
+        match => [ "timestamp", "MMM  d HH:mm:ss", "MMM dd HH:mm:ss" ]
+      }
+      mutate {
+        add_field => { "[@metadata][target_index]" => "syslog" }
+      }
+    }
+    
+    # GeoIP enrichment for external IPs
+    if [src_ip] {
+      geoip {
+        source => "src_ip"
+        target => "geoip"
+      }
+    }
+    
+    # Add timestamp if missing
+    if !["@timestamp"] {
+      mutate {
+        add_field => { "@timestamp" => "%{ISOTIMESTAMP}" }
+      }
+    }
+  }
+  
+  # Output: Send to Elasticsearch
+  output {
+    elasticsearch {
+      hosts => ["https://10.0.30.11:9200", "https://10.0.30.12:9200"]
+      user => "logstash_writer"
+      password => "secure_password"
+      
+      # Dynamic index based on log type
+      index => "%{[@metadata][target_index]}-%{+YYYY.MM.dd}"
+      
+      # SSL/TLS
+      ssl => true
+      cacert => "/etc/logstash/certs/ca.crt"
+      
+      # Manage template
+      manage_template => true
+    }
+    
+    # Debug output (remove in production)
+    # stdout { codec => rubydebug }
+  }
+  ```
+  
+  ### Testing Pipeline
+  
+  ```bash
+  # Test configuration syntax
+  sudo -u logstash /usr/share/logstash/bin/logstash --config.test_and_exit \
+    -f /etc/logstash/conf.d/soc-pipeline.conf
+  
+  # Run with debug output
+  sudo -u logstash /usr/share/logstash/bin/logstash \
+    -f /etc/logstash/conf.d/soc-pipeline.conf --log.level=debug
+  ```
+</Accordion>
+
+<Accordion title="Snort/Suricata IDS Configuration">
+  ### Suricata Configuration (Recommended)
+  
+  **File**: `/etc/suricata/suricata.yaml`
+  
+  ```yaml
+  # Network interfaces
+  af-packet:
+    - interface: eth1  # Monitoring interface
+      cluster-id: 99
+      cluster-type: cluster_flow
+      defrag: yes
+      use-mmap: yes
+      ring-size: 2048
+  
+  # Home network definition
+  vars:
+    address-groups:
+      HOME_NET: "[10.0.0.0/8, 192.168.0.0/16, 172.16.0.0/12]"
+      EXTERNAL_NET: "!$HOME_NET"
+      
+      DNS_SERVERS: "[10.0.30.53]"
+      HTTP_SERVERS: "[10.0.10.0/24]"
+      SMTP_SERVERS: "[10.0.10.25]"
+  
+  # Output configuration
+  outputs:
+    - eve-log:
+        enabled: yes
+        filetype: regular
+        filename: /var/log/suricata/eve.json
+        
+        types:
+          - alert:
+              payload: yes
+              payload-buffer-size: 4kb
+              payload-printable: yes
+              packet: yes
+              metadata: yes
+          
+          - http:
+              extended: yes
+          
+          - dns:
+              query: yes
+              answer: yes
+          
+          - tls:
+              extended: yes
+          
+          - files:
+              force-magic: yes
+          
+          - flow
+  
+  # Rule files
+  rule-files:
+    - suricata.rules
+    - /etc/suricata/rules/emerging-threats.rules
+    - /etc/suricata/rules/local.rules
+  
+  # Performance tuning
+  threading:
+    set-cpu-affinity: yes
+    cpu-affinity:
+      - management-cpu-set:
+          cpu: [ 0 ]
+      - receive-cpu-set:
+          cpu: [ 1, 2, 3 ]
+      - worker-cpu-set:
+          cpu: [ 4, 5, 6, 7 ]
+  
+  # Detection engine
+  detect:
+    profile: medium
+    custom-values:
+      toclient-groups: 3
+      toserver-groups: 25
+  
+  # Stream engine
+  stream:
+    memcap: 64mb
+    checksum-validation: yes
+    inline: auto
+  ```
+  
+  ### Rule Management
+  
+  ```bash
+  # Install Suricata-Update for rule management
+  sudo pip3 install suricata-update
+  
+  # Enable Emerging Threats ruleset
+  sudo suricata-update enable-source et/open
+  
+  # Update rules
+  sudo suricata-update
+  
+  # Reload Suricata with new rules
+  sudo kill -USR2 $(pidof suricata)
+  ```
+  
+  ### Custom Local Rules
+  
+  **File**: `/etc/suricata/rules/local.rules`
+  
+  ```suricata
+  # Alert on potential web attacks
+  alert http any any -> $HOME_NET any (msg:"Potential SQL Injection"; \
+    flow:to_server,established; content:"UNION"; nocase; \
+    content:"SELECT"; nocase; sid:1000001; rev:1;)
+  
+  # Alert on suspicious DNS queries
+  alert dns any any -> any any (msg:"DNS Query for Known Malicious Domain"; \
+    dns_query; content:"evil.com"; nocase; sid:1000002; rev:1;)
+  
+  # Alert on unusual outbound traffic
+  alert tcp $HOME_NET any -> $EXTERNAL_NET 4444 (msg:"Potential C2 Traffic"; \
+    flow:to_server,established; sid:1000003; rev:1;)
+  ```
+  
+  <Warning>
+  IDS rule tuning is critical to reduce false positives. Plan for several weeks of baseline monitoring and rule adjustment.
+  </Warning>
+</Accordion>
+
+<Accordion title="Zabbix Configuration">
+  ### Server Configuration
+  
+  **File**: `/etc/zabbix/zabbix_server.conf`
+  
+  ```ini
+  # Database connection
+  DBHost=localhost
+  DBName=zabbix
+  DBUser=zabbix_user
+  DBPassword=secure_password
+  
+  # Network settings
+  ListenPort=10051
+  SourceIP=10.0.30.40
+  
+  # Performance tuning
+  StartPollers=10
+  StartPollersUnreachable=5
+  StartTrappers=5
+  StartPingers=5
+  StartDiscoverers=5
+  
+  CacheSize=128M
+  HistoryCacheSize=64M
+  TrendCacheSize=32M
+  ValueCacheSize=64M
+  
+  # Timeouts
+  Timeout=10
+  ```
+  
+  ### Agent Configuration (on monitored hosts)
+  
+  **File**: `/etc/zabbix/zabbix_agentd.conf`
+  
+  ```ini
+  # Zabbix server address
+  Server=10.0.30.40
+  ServerActive=10.0.30.40
+  
+  # Agent identification
+  Hostname=webserver-01
+  
+  # Network settings
+  ListenPort=10050
+  
+  # Allow remote commands (use cautiously)
+  EnableRemoteCommands=0
+  
+  # User parameters for custom monitoring
+  UserParameter=custom.metric,/usr/local/bin/custom_check.sh
+  ```
+  
+  ### SOC-Specific Monitoring Templates
+  
+  Monitor SOC infrastructure itself:
+  - Elasticsearch cluster health
+  - Wazuh manager status and agent count
+  - Logstash pipeline throughput
+  - IDS sensor CPU and packet drop rate
+  
+  Create custom Zabbix templates for these components or use community templates.
+</Accordion>
+
+<Accordion title="Prometheus Configuration">
+  ### Main Configuration
+  
+  **File**: `/etc/prometheus/prometheus.yml`
+  
+  ```yaml
+  # Global configuration
+  global:
+    scrape_interval: 15s
+    evaluation_interval: 15s
+    external_labels:
+      cluster: 'soc-production'
+      env: 'production'
+  
+  # Alertmanager configuration
+  alerting:
+    alertmanagers:
+      - static_configs:
+          - targets:
+              - 'localhost:9093'
+  
+  # Load alerting rules
+  rule_files:
+    - '/etc/prometheus/rules/*.yml'
+  
+  # Scrape configurations
+  scrape_configs:
+    # Prometheus itself
+    - job_name: 'prometheus'
+      static_configs:
+        - targets: ['localhost:9090']
+    
+    # Node exporters (system metrics)
+    - job_name: 'node-exporter'
+      static_configs:
+        - targets:
+            - '10.0.30.11:9100'  # Elasticsearch node 1
+            - '10.0.30.12:9100'  # Elasticsearch node 2
+            - '10.0.30.10:9100'  # Wazuh manager
+            - '10.0.30.20:9100'  # Logstash
+    
+    # Elasticsearch cluster metrics
+    - job_name: 'elasticsearch'
+      static_configs:
+        - targets:
+            - '10.0.30.11:9114'  # Elasticsearch exporter
+      metrics_path: /metrics
+    
+    # Logstash metrics
+    - job_name: 'logstash'
+      static_configs:
+        - targets:
+            - '10.0.30.20:9600'
+      metrics_path: /_node/stats
+  ```
+  
+  ### Alert Rules
+  
+  **File**: `/etc/prometheus/rules/soc-alerts.yml`
+  
+  ```yaml
+  groups:
+    - name: soc_infrastructure
+      interval: 30s
+      rules:
+        # Elasticsearch cluster health
+        - alert: ElasticsearchClusterRed
+          expr: elasticsearch_cluster_health_status{color="red"} == 1
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Elasticsearch cluster is RED"
+            description: "Cluster {{ $labels.cluster }} is in RED state"
+        
+        # High memory usage
+        - alert: HighMemoryUsage
+          expr: (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) < 0.1
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High memory usage on {{ $labels.instance }}"
+        
+        # Logstash pipeline backlog
+        - alert: LogstashBacklog
+          expr: logstash_pipeline_events_out_total < logstash_pipeline_events_in_total
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Logstash pipeline {{ $labels.pipeline }} has backlog"
+  ```
+</Accordion>
+
+<Accordion title="TheHive Configuration">
+  ### Main Configuration
+  
+  **File**: `/etc/thehive/application.conf`
+  
+  ```hocon
+  # Database configuration (Elasticsearch)
+  db {
+    provider: janusgraph
+    janusgraph {
+      storage {
+        backend: elasticsearch
+        hostname: ["10.0.30.11", "10.0.30.12"]
+        index-name: thehive
+        username: "thehive_user"
+        password: "secure_password"
+      }
+      index.search {
+        backend: elasticsearch
+        hostname: ["10.0.30.11", "10.0.30.12"]
+        index-name: thehive
+      }
+    }
+  }
+  
+  # File storage
+  storage {
+    provider: localfs
+    localfs.location: /opt/thehive/data
+  }
+  
+  # Authentication
+  auth {
+    providers: [
+      {name: local}
+      {name: ldap, host: "ldap.example.com", bindDN: "cn=thehive,ou=services,dc=example,dc=com"}
+    ]
+  }
+  
+  # Cortex integration
+  play.modules.enabled += org.thp.thehive.connector.cortex.CortexModule
+  cortex {
+    servers: [
+      {
+        name: "Cortex-01"
+        url: "http://10.0.30.51:9001"
+        auth {
+          type: "bearer"
+          key: "cortex_api_key"
+        }
+      }
+    ]
+  }
+  ```
+  
+  ### Cortex Configuration
+  
+  **File**: `/etc/cortex/application.conf`
+  
+  ```hocon
+  # Elasticsearch database
+  search {
+    index: cortex
+    uri: "http://10.0.30.11:9200"
+  }
+  
+  # Analyzer paths
+  analyzer {
+    path: [
+      "/opt/cortex/analyzers"
+    ]
+  }
+  
+  # Job directory
+  job {
+    directory: "/opt/cortex/jobs"
+  }
+  ```
+</Accordion>
+
+## Integration Points
+
+### Data Flow Configuration
+
+<Info>
+The SOC architecture follows this data flow:
+1. Endpoints → IDS/Agents → Logstash → Elasticsearch → Wazuh Dashboard
+2. Alerts (high severity) → TheHive → Cortex → Automated Response
+3. Infrastructure metrics → Zabbix/Prometheus → Dashboards
+</Info>
+
+### Integration Matrix
+
+| Source | Destination | Integration Method | Configuration Location |
+|--------|-------------|-------------------|------------------------|
+| Wazuh Agents | Wazuh Manager | Native agent protocol | `/var/ossec/etc/ossec.conf` on agent |
+| Wazuh Manager | Elasticsearch | Built-in integration | `/var/ossec/etc/ossec.conf` (integration block) |
+| Suricata/Snort | Logstash | File input (EVE JSON) | `/etc/logstash/conf.d/` |
+| Logstash | Elasticsearch | Elasticsearch output | `/etc/logstash/conf.d/` |
+| Wazuh | TheHive | Webhook integration | `/var/ossec/etc/ossec.conf` (integration block) |
+| TheHive | Cortex | Built-in connector | `/etc/thehive/application.conf` |
+| All systems | Prometheus | Exporters (node_exporter, etc.) | `/etc/prometheus/prometheus.yml` |
+| Systems | Zabbix | Zabbix agent | `/etc/zabbix/zabbix_agentd.conf` |
+
+## Log Forwarding Rules
+
+### Wazuh Agent Log Collection
+
+**On endpoints** - configure what logs to collect:
+
+```xml
+<!-- In /var/ossec/etc/ossec.conf on agent -->
+<localfile>
+  <log_format>syslog</log_format>
+  <location>/var/log/syslog</location>
+</localfile>
+
+<localfile>
+  <log_format>syslog</log_format>
+  <location>/var/log/auth.log</location>
+</localfile>
+
+<localfile>
+  <log_format>apache</log_format>
+  <location>/var/log/apache2/access.log</location>
+</localfile>
+
+<localfile>
+  <log_format>json</log_format>
+  <location>/var/log/app/application.json</location>
+</localfile>
+```
+
+### Syslog Forwarding to Logstash
+
+**On network devices** (firewalls, switches, routers):
+
+```bash
+# Cisco IOS example
+configure terminal
+logging host 10.0.30.20 transport tcp port 5140
+logging trap informational
+end
+
+# Linux rsyslog forwarding
+echo "*.* @@10.0.30.20:5140" >> /etc/rsyslog.conf
+systemctl restart rsyslog
+```
+
+### Filebeat for Application Logs
+
+**File**: `/etc/filebeat/filebeat.yml`
+
+```yaml
+filebeat.inputs:
+  - type: log
+    enabled: true
+    paths:
+      - /var/log/nginx/access.log
+      - /var/log/nginx/error.log
+    fields:
+      service: nginx
+      environment: production
+  
+  - type: log
+    enabled: true
+    paths:
+      - /var/log/mysql/error.log
+    fields:
+      service: mysql
+
+output.logstash:
+  hosts: ["10.0.30.20:5044"]
+  ssl.certificate_authorities: ["/etc/filebeat/ca.crt"]
+```
+
+## Security Configuration
+
+### SSL/TLS Certificates
+
+<Steps>
+  <Step title="Generate CA Certificate">
+    ```bash
+    # Create CA for internal SOC communication
+    openssl genrsa -out ca-key.pem 4096
+    openssl req -new -x509 -days 3650 -key ca-key.pem -out ca-cert.pem
+    ```
+  </Step>
+  
+  <Step title="Generate Component Certificates">
+    ```bash
+    # For each component (Elasticsearch, Logstash, Wazuh, etc.)
+    openssl genrsa -out component-key.pem 2048
+    openssl req -new -key component-key.pem -out component.csr
+    openssl x509 -req -days 365 -in component.csr -CA ca-cert.pem \
+      -CAkey ca-key.pem -CAcreateserial -out component-cert.pem
+    ```
+  </Step>
+  
+  <Step title="Distribute Certificates">
+    - Install CA certificate on all SOC components
+    - Configure each component to use its certificate
+    - Enable TLS/SSL in component configurations
+  </Step>
+</Steps>
+
+### Authentication and Authorization
+
+<Note>
+Implement role-based access control (RBAC) for all SOC components:
+- **SOC Analysts**: Read access to dashboards, create/update incidents
+- **SOC Engineers**: Configure rules, manage integrations
+- **SOC Managers**: Full administrative access, reporting
+- **Auditors**: Read-only access to all data
+</Note>
+
+## Testing and Validation
+
+### End-to-End Data Flow Test
+
+<Steps>
+  <Step title="Generate Test Event on Endpoint">
+    ```bash
+    # On a monitored endpoint with Wazuh agent
+    logger -p auth.warn "TEST: SOC data flow validation - $(date)"
+    ```
+  </Step>
+  
+  <Step title="Verify in Wazuh Manager">
+    ```bash
+    # Check Wazuh manager received the event
+    tail -f /var/ossec/logs/alerts/alerts.log | grep "SOC data flow"
+    ```
+  </Step>
+  
+  <Step title="Verify in Elasticsearch">
+    ```bash
+    # Query Elasticsearch for the event
+    curl -X GET "https://10.0.30.11:9200/wazuh-alerts-*/_search?q=SOC+data+flow"
+    ```
+  </Step>
+  
+  <Step title="Verify in Wazuh Dashboard">
+    Access Wazuh dashboard and search for "SOC data flow" in Discover view.
+  </Step>
+</Steps>
+
+### IDS Alert Test
+
+```bash
+# Generate test IDS alert (EICAR test pattern)
+curl http://testmyids.com
+
+# Check Suricata detected it
+tail /var/log/suricata/eve.json | grep -i eicar
+
+# Verify alert appears in Elasticsearch
+curl -X GET "https://10.0.30.11:9200/suricata-alerts-*/_search?q=eicar"
+```
+
+## Performance Tuning
+
+### Elasticsearch Optimization
+
+- **Refresh interval**: Increase for bulk indexing (30s instead of 1s)
+- **Bulk size**: Optimize Logstash batch size (125-500)
+- **Shard sizing**: Target 20-50 GB per shard
+- **Replica timing**: Add replicas after initial data load
+
+### Wazuh Manager Optimization
+
+```xml
+<!-- Increase queue sizes for high agent counts -->
+<remote>
+  <queue_size>262144</queue_size>
+</remote>
+
+<!-- Optimize analysis threads -->
+<global>
+  <agents_disconnection_time>600</agents_disconnection_time>
+  <agents_disconnection_alert_time>1200</agents_disconnection_alert_time>
+</global>
+```
+
+## Configuration Management
+
+<Info>
+**Best Practice**: Store all configurations in Git repository
+- Track changes over time
+- Enable rollback if configuration causes issues
+- Document why configuration changes were made
+- Review configuration changes through pull requests
+</Info>
+
+### Example Repository Structure
+
+```
+soc-config/
+├── elasticsearch/
+│   ├── elasticsearch.yml
+│   ├── jvm.options
+│   └── index-templates/
+├── wazuh/
+│   ├── ossec.conf
+│   ├── rules/
+│   └── decoders/
+├── logstash/
+│   └── pipelines/
+├── suricata/
+│   ├── suricata.yaml
+│   └── rules/
+├── prometheus/
+│   ├── prometheus.yml
+│   └── rules/
+└── automation/
+    ├── terraform/
+    └── ansible/
+```
+
+## Configuration Checklist
+
+Before going to production:
+
+- [ ] All components configured and tested individually
+- [ ] Integrations between components verified
+- [ ] SSL/TLS enabled for all network communication
+- [ ] Authentication and RBAC configured
+- [ ] Log forwarding from all sources working
+- [ ] Data flow end-to-end tested
+- [ ] Alert rules tuned and false positives minimized
+- [ ] Dashboards created for SOC analysts
+- [ ] Performance tuning completed
+- [ ] Configurations version-controlled in Git
+- [ ] Backup and restore procedures tested
+- [ ] Monitoring of SOC infrastructure enabled
+- [ ] Documentation updated with final configurations
+- [ ] Team trained on configuration changes
+
+## Next Steps
+
+With configuration complete:
+
+1. Begin operational tuning and baseline establishment
+2. Develop playbooks for common security events
+3. Train SOC team on using the platform
+4. Establish metrics and KPIs for SOC effectiveness
+5. Plan regular configuration reviews and updates
+
+<Info>
+Configuration is an iterative process. Plan for continuous tuning based on operational experience, new threats, and changing infrastructure.
+</Info>

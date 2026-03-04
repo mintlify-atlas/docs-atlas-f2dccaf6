@@ -1,122 +1,95 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "Enterprise SOC Architecture",
+  "theme": "aspen",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#3b87f9",
+    "light": "#0e2444",
+    "dark": "#cad9fc"
   },
-  "favicon": "/favicon.svg",
+  "favicon": "/logo.png",
+  "logo": {
+    "light": "https://media.brand.dev/bdbb9896-30dc-4ef6-a515-1a9ace80a813.png",
+    "dark": "https://media.brand.dev/bdbb9896-30dc-4ef6-a515-1a9ace80a813.png"
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/iLotuus/Enterprise-SOC-Architecture"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/iLotuus/Enterprise-SOC-Architecture"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Overview",
             "pages": [
-              "index",
-              "quickstart",
-              "development"
+              "introduction",
+              "architecture-overview",
+              "design-principles"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Architecture Components",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "components/detection-layer",
+              "components/siem-platform",
+              "components/log-aggregation",
+              "components/infrastructure-monitoring",
+              "components/incident-response",
+              "components/automation-soar"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Deployment",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "deployment/prerequisites",
+              "deployment/network-setup",
+              "deployment/component-installation",
+              "deployment/configuration"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "Operations",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "operations/monitoring-guide",
+              "operations/incident-handling",
+              "operations/threat-hunting",
+              "operations/maintenance"
+            ]
+          },
+          {
+            "group": "Security",
+            "pages": [
+              "security/threat-detection",
+              "security/best-practices",
+              "security/compliance"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Resources",
             "pages": [
-              "api-reference/introduction"
-            ]
-          },
-          {
-            "group": "Endpoint examples",
-            "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "reference/technology-stack",
+              "reference/data-flow",
+              "reference/integrations",
+              "reference/roadmap",
+              "reference/glossary"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

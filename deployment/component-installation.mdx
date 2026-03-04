@@ -1,0 +1,653 @@
+---
+title: Component Installation
+description: Installation order, deployment architectures, and high availability strategies for SOC components
+---
+
+<Warning>
+This project is currently in the **design phase**. The installation procedures described here are planning guidelines based on the conceptual architecture. Actual installation steps will be finalized during implementation.
+</Warning>
+
+## Overview
+
+This guide outlines the recommended installation order, deployment strategies, and architectural considerations for deploying the Enterprise SOC Architecture. Components must be installed in a specific sequence to satisfy dependencies.
+
+## Installation Order and Dependencies
+
+<Info>
+Components should be installed in the order presented below to ensure dependencies are met at each stage.
+</Info>
+
+### Dependency Graph
+
+```
+Phase 1: Foundation
+├── Operating System & Base Configuration
+└── Network Configuration (VLANs, Firewall Rules)
+
+Phase 2: Core Infrastructure  
+├── Elasticsearch Cluster (storage layer)
+│   └── Required by: Wazuh, TheHive, Logstash
+└── Database Systems (MySQL/PostgreSQL)
+    └── Required by: Zabbix, TheHive (alternative)
+
+Phase 3: Data Pipeline
+├── Logstash/Fluentd (log aggregation)
+│   ├── Depends on: Elasticsearch
+│   └── Required by: IDS/IPS, various log sources
+
+Phase 4: Security Platform Core
+├── Wazuh Manager
+│   ├── Depends on: Elasticsearch
+│   └── Required by: Wazuh Agents, integrations
+└── Wazuh Dashboard
+    └── Depends on: Wazuh Manager, Elasticsearch
+
+Phase 5: Monitoring Systems
+├── Zabbix Server
+│   └── Depends on: Database (MySQL/PostgreSQL)
+├── Prometheus
+│   └── Standalone (minimal dependencies)
+└── Grafana (optional)
+    └── Data sources: Prometheus, Elasticsearch
+
+Phase 6: Detection Layer
+├── Snort/Suricata IDS
+│   └── Depends on: Logstash (for alert forwarding)
+
+Phase 7: Incident Response
+├── TheHive
+│   └── Depends on: Elasticsearch or Cassandra
+└── Cortex (SOAR)
+    └── Depends on: TheHive
+
+Phase 8: Automation (Optional)
+├── Terraform/PyInfra setup
+│   └── For infrastructure as code management
+
+Phase 9: Future Components (Long-term)
+├── OPNsense Firewall
+├── Honeypots on Proxmox
+└── Tailscale VPN
+```
+
+## Deployment Architecture Strategies
+
+<Tabs>
+  <Tab title="Single Server (Lab/POC)">
+    ### All-in-One Deployment
+    
+    **Use Case**: Testing, proof of concept, small environments (less than 50 endpoints)
+    
+    **Architecture**:
+    - Single server hosts all SOC components
+    - Containers (Docker/Podman) or VMs for service isolation
+    - Minimal high availability
+    
+    **Minimum Specifications**:
+    - **CPU**: 16 cores
+    - **RAM**: 64 GB
+    - **Storage**: 2 TB SSD
+    - **Network**: 2x 1 Gbps NICs (management + monitoring)
+    
+    **Advantages**:
+    - Simple deployment and management
+    - Lower hardware costs
+    - Easy for testing and learning
+    
+    **Limitations**:
+    - No high availability
+    - Limited scalability
+    - Single point of failure
+    - Resource contention between components
+    
+    <Warning>
+    Single-server deployments are NOT recommended for production environments. Use only for testing or very small deployments.
+    </Warning>
+    
+    **Installation Approach**:
+    ```bash
+    # Example using Docker Compose
+    # All components defined in single docker-compose.yml
+    
+    services:
+      elasticsearch:
+        image: elasticsearch:8.x
+        # ... configuration
+      
+      wazuh-manager:
+        image: wazuh/wazuh-manager:latest
+        depends_on:
+          - elasticsearch
+      
+      logstash:
+        image: logstash:8.x
+        depends_on:
+          - elasticsearch
+      
+      # Additional services...
+    ```
+  </Tab>
+  
+  <Tab title="Distributed (Production)">
+    ### Multi-Server Deployment
+    
+    **Use Case**: Production environments, medium to large scale (>50 endpoints)
+    
+    **Architecture**:
+    - Dedicated servers for critical components
+    - Elasticsearch cluster (3+ nodes)
+    - Separate servers for Wazuh, monitoring, incident response
+    - Load balancing for high availability
+    
+    **Server Allocation**:
+    
+    | Role | Components | Count | Specs (each) |
+    |------|-----------|-------|-------------|
+    | **ES Cluster** | Elasticsearch nodes | 3-5 | 16 cores, 64 GB RAM, 4 TB SSD |
+    | **SIEM Core** | Wazuh Manager + Dashboard | 2 (HA) | 8 cores, 32 GB RAM, 500 GB SSD |
+    | **Log Pipeline** | Logstash/Fluentd | 2-3 | 8 cores, 16 GB RAM, 500 GB SSD |
+    | **IDS/IPS** | Snort/Suricata sensors | 2+ | 8 cores, 32 GB RAM, 1 TB SSD |
+    | **Monitoring** | Zabbix + Prometheus | 2 | 8 cores, 16 GB RAM, 1 TB SSD |
+    | **Incident Response** | TheHive + Cortex | 2 | 8 cores, 32 GB RAM, 1 TB SSD |
+    
+    **Advantages**:
+    - High availability and redundancy
+    - Better performance and scalability
+    - Fault isolation (component failure doesn't affect others)
+    - Easier capacity planning per component
+    
+    **Considerations**:
+    - Higher hardware and licensing costs
+    - More complex configuration and management
+    - Requires robust network infrastructure
+    - Need for centralized configuration management
+    
+    <Info>
+    This is the **recommended architecture** for production SOC deployments.
+    </Info>
+  </Tab>
+  
+  <Tab title="Hybrid Cloud">
+    ### Cloud + On-Premises Hybrid
+    
+    **Use Case**: Multi-site organizations, cloud-first strategies, geographic distribution
+    
+    **Architecture**:
+    - Core SOC components in cloud (AWS, Azure, GCP)
+    - On-premises agents and sensors
+    - Encrypted tunnels for communication
+    - Cloud-native storage and scaling
+    
+    **Component Placement**:
+    
+    **Cloud-hosted**:
+    - Elasticsearch cluster (managed service like AWS OpenSearch)
+    - Wazuh Manager and Dashboard
+    - TheHive + Cortex
+    - Centralized log storage
+    
+    **On-premises**:
+    - Wazuh agents on endpoints
+    - IDS/IPS sensors (network monitoring)
+    - Local Logstash forwarders (buffer and compress)
+    - Zabbix/Prometheus agents
+    
+    **Advantages**:
+    - Scalability and elasticity
+    - Reduced on-premises infrastructure
+    - Geographic redundancy
+    - Managed services reduce operational overhead
+    
+    **Challenges**:
+    - Bandwidth costs for log transmission
+    - Latency considerations
+    - Data residency and compliance requirements
+    - Cloud security configuration complexity
+    
+    <Note>
+    Consider data egress costs when transmitting large volumes of logs to cloud. Use compression and filtering to optimize.
+    </Note>
+  </Tab>
+  
+  <Tab title="Containerized (Kubernetes)">
+    ### Kubernetes Orchestration
+    
+    **Use Case**: Organizations with existing Kubernetes infrastructure, need for automation
+    
+    **Architecture**:
+    - SOC components deployed as Kubernetes workloads
+    - Helm charts for standardized deployment
+    - Persistent volumes for stateful components
+    - Ingress controllers for external access
+    
+    **Kubernetes Resources**:
+    ```yaml
+    # Example namespace structure
+    Namespace: soc-core
+      - elasticsearch (StatefulSet, 3 replicas)
+      - wazuh-manager (Deployment, 2 replicas)
+      - wazuh-dashboard (Deployment, 2 replicas)
+      - logstash (Deployment, 2 replicas)
+    
+    Namespace: soc-monitoring  
+      - prometheus (StatefulSet)
+      - zabbix-server (Deployment)
+      - grafana (Deployment)
+    
+    Namespace: soc-ir
+      - thehive (StatefulSet)
+      - cortex (Deployment)
+    ```
+    
+    **Advantages**:
+    - Automated scaling and self-healing
+    - Declarative configuration (GitOps)
+    - Rolling updates and easy rollbacks
+    - Resource optimization and multi-tenancy
+    
+    **Complexity**:
+    - Requires Kubernetes expertise
+    - Stateful applications need careful planning (storage classes, PVs)
+    - Network policies for security isolation
+    - Not all SOC components have official Helm charts
+    
+    <Info>
+    Several SOC components have community-maintained Helm charts. Evaluate and test thoroughly before production use.
+    </Info>
+  </Tab>
+</Tabs>
+
+## High Availability Considerations
+
+### Critical Components Requiring HA
+
+<Steps>
+  <Step title="Elasticsearch Cluster">
+    **HA Strategy**: Multi-node cluster with replication
+    
+    - Deploy 3+ nodes (odd number for split-brain prevention)
+    - Configure index replication (minimum 1 replica)
+    - Use dedicated master-eligible nodes in large clusters
+    - Implement cluster-level shard allocation awareness
+    
+    **Configuration Highlights**:
+    ```yaml
+    # elasticsearch.yml
+    cluster.name: soc-elasticsearch
+    node.name: es-node-01
+    discovery.seed_hosts: ["es-node-01", "es-node-02", "es-node-03"]
+    cluster.initial_master_nodes: ["es-node-01", "es-node-02", "es-node-03"]
+    
+    # Replication for HA
+    index.number_of_replicas: 1
+    ```
+    
+    <Warning>
+    Never run Elasticsearch in production with `number_of_replicas: 0`. Data loss will occur on node failure.
+    </Warning>
+  </Step>
+  
+  <Step title="Wazuh Manager Cluster">
+    **HA Strategy**: Master-worker cluster architecture
+    
+    - Deploy master node and one or more worker nodes
+    - Agents connect to cluster (automatic failover)
+    - Shared configuration and rules across cluster
+    - Load balancer distributes agent connections
+    
+    **Setup**:
+    - Configure cluster in `/var/ossec/etc/ossec.conf`
+    - Enable cluster mode and set cluster key
+    - Configure node type (master/worker)
+    - Use load balancer (HAProxy, nginx) for agent connections
+  </Step>
+  
+  <Step title="Logstash Pipeline Redundancy">
+    **HA Strategy**: Multiple pipeline instances with load balancing
+    
+    - Deploy 2+ Logstash instances
+    - Use load balancer for input (if using Beats)
+    - Configure persistent queues for data durability
+    - Monitor pipeline throughput and backpressure
+    
+    **Configuration**:
+    ```ruby
+    # logstash.yml
+    queue.type: persisted
+    queue.max_bytes: 4gb
+    ```
+  </Step>
+  
+  <Step title="Database High Availability">
+    **HA Strategy**: Database replication and clustering
+    
+    **For MySQL/PostgreSQL** (Zabbix, TheHive):
+    - Master-slave replication
+    - Automatic failover (using tools like Patroni for PostgreSQL)
+    - Regular backups to separate storage
+    
+    **For Cassandra** (TheHive alternative):
+    - Multi-node cluster with replication factor 3
+    - Distributed architecture provides natural HA
+  </Step>
+  
+  <Step title="Application Load Balancing">
+    **HA Strategy**: Load balancers for web interfaces
+    
+    **Components needing load balancing**:
+    - Wazuh Dashboard (multiple dashboard instances)
+    - TheHive web interface
+    - Grafana dashboards
+    
+    **Implementation options**:
+    - HAProxy (open source, highly recommended)
+    - Nginx (reverse proxy + load balancing)
+    - Cloud load balancers (ALB on AWS, Azure Load Balancer)
+    
+    **Example HAProxy config**:
+    ```haproxy
+    frontend wazuh_dashboard
+        bind *:443 ssl crt /etc/ssl/certs/wazuh.pem
+        default_backend wazuh_servers
+    
+    backend wazuh_servers
+        balance roundrobin
+        option httpchk GET /
+        server wazuh01 10.0.30.11:443 check ssl verify none
+        server wazuh02 10.0.30.12:443 check ssl verify none
+    ```
+  </Step>
+</Steps>
+
+### Backup and Disaster Recovery
+
+<Note>
+High availability prevents service interruption, but backups protect against data loss, corruption, and disasters.
+</Note>
+
+**Backup Strategy**:
+
+| Component | Backup Method | Frequency | Retention |
+|-----------|---------------|-----------|----------|
+| **Elasticsearch** | Snapshot API to S3/NFS | Daily | 30 days |
+| **Wazuh Configuration** | File backup of `/var/ossec` | Daily | 90 days |
+| **TheHive Database** | Database dump or snapshot | Daily | 90 days |
+| **Zabbix Database** | MySQL/PostgreSQL dump | Daily | 30 days |
+| **Custom Rules/Scripts** | Git repository | On change | Indefinite |
+| **System Configs** | Configuration management (Terraform/Ansible) | On change | Indefinite |
+
+**Disaster Recovery Plan**:
+1. **Document recovery procedures** for each component
+2. **Test restoration** quarterly (minimum)
+3. **Maintain runbooks** for critical failure scenarios
+4. **Store backups off-site** or in separate cloud region
+5. **Define RTO/RPO** (Recovery Time/Point Objectives) for each tier
+
+## Installation Steps by Component
+
+### Phase 1: Foundation
+
+<Accordion title="Operating System Preparation">
+  **For all servers**:
+  
+  ```bash
+  # Update system packages
+  sudo apt update && sudo apt upgrade -y  # Debian/Ubuntu
+  sudo yum update -y                       # RHEL/CentOS
+  
+  # Install common dependencies
+  sudo apt install -y curl wget gnupg2 software-properties-common \
+    apt-transport-https ca-certificates ntp
+  
+  # Configure NTP for time synchronization
+  sudo systemctl enable ntp
+  sudo systemctl start ntp
+  
+  # Configure firewall (example using ufw)
+  sudo ufw enable
+  # Add specific rules per component (see Network Setup guide)
+  
+  # Set hostname appropriately
+  sudo hostnamectl set-hostname soc-component-name
+  ```
+  
+  **Security hardening**:
+  - Disable root SSH login
+  - Configure SSH key-based authentication
+  - Enable automatic security updates
+  - Install and configure fail2ban
+</Accordion>
+
+### Phase 2: Core Infrastructure
+
+<Accordion title="Elasticsearch Cluster Installation">
+  **Installation** (per node):
+  
+  ```bash
+  # Import Elasticsearch GPG key
+  wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | \
+    sudo gpg --dearmor -o /usr/share/keyrings/elasticsearch-keyring.gpg
+  
+  # Add repository
+  echo "deb [signed-by=/usr/share/keyrings/elasticsearch-keyring.gpg] \
+    https://artifacts.elastic.co/packages/8.x/apt stable main" | \
+    sudo tee /etc/apt/sources.list.d/elastic-8.x.list
+  
+  # Install Elasticsearch
+  sudo apt update && sudo apt install elasticsearch
+  
+  # Configure cluster (edit /etc/elasticsearch/elasticsearch.yml)
+  # See Configuration guide for details
+  
+  # Enable and start service
+  sudo systemctl daemon-reload
+  sudo systemctl enable elasticsearch
+  sudo systemctl start elasticsearch
+  
+  # Verify cluster health
+  curl -X GET "localhost:9200/_cluster/health?pretty"
+  ```
+  
+  <Warning>
+  Save the auto-generated elastic superuser password during installation. It's displayed once and needed for initial configuration.
+  </Warning>
+</Accordion>
+
+<Accordion title="Database Installation (MySQL/PostgreSQL)">
+  **For Zabbix and TheHive** (if not using Elasticsearch/Cassandra):
+  
+  ```bash
+  # PostgreSQL installation (recommended)
+  sudo apt install postgresql postgresql-contrib
+  
+  # Start and enable
+  sudo systemctl enable postgresql
+  sudo systemctl start postgresql
+  
+  # Create databases
+  sudo -u postgres psql
+  CREATE DATABASE zabbix;
+  CREATE DATABASE thehive;
+  CREATE USER zabbix_user WITH PASSWORD 'secure_password';
+  CREATE USER thehive_user WITH PASSWORD 'secure_password';
+  GRANT ALL PRIVILEGES ON DATABASE zabbix TO zabbix_user;
+  GRANT ALL PRIVILEGES ON DATABASE thehive TO thehive_user;
+  \q
+  ```
+</Accordion>
+
+### Phase 3-7: Component Installation
+
+<Info>
+Detailed installation procedures for each component (Wazuh, Logstash, Snort/Suricata, Zabbix, Prometheus, TheHive, Cortex) will be provided in component-specific documentation. The key is to follow the installation order defined in the dependency graph above.
+</Info>
+
+**General installation pattern**:
+1. Add official package repository
+2. Install package via package manager
+3. Configure component (see [Configuration](/deployment/configuration) guide)
+4. Enable and start systemd service
+5. Verify component health and connectivity
+6. Integrate with dependent components
+
+### Phase 8: Automation Tools
+
+<Accordion title="Infrastructure as Code Setup">
+  **Terraform** (for infrastructure provisioning):
+  
+  ```bash
+  # Install Terraform
+  wget https://releases.hashicorp.com/terraform/latest/terraform_linux_amd64.zip
+  unzip terraform_linux_amd64.zip
+  sudo mv terraform /usr/local/bin/
+  
+  # Verify installation
+  terraform version
+  
+  # Initialize SOC infrastructure code
+  mkdir -p ~/soc-terraform
+  cd ~/soc-terraform
+  terraform init
+  ```
+  
+  **PyInfra** (for configuration management):
+  
+  ```bash
+  # Install PyInfra
+  pip3 install pyinfra
+  
+  # Create deployment scripts
+  mkdir -p ~/soc-pyinfra
+  # Add deployment scripts for SOC components
+  ```
+</Accordion>
+
+## Post-Installation Validation
+
+<Steps>
+  <Step title="Component Health Checks">
+    Verify each component is running and accessible:
+    
+    ```bash
+    # Elasticsearch
+    curl -X GET "localhost:9200/_cluster/health"
+    
+    # Wazuh Manager
+    sudo systemctl status wazuh-manager
+    
+    # Check all systemd services
+    sudo systemctl status elasticsearch wazuh-manager logstash \
+      zabbix-server prometheus
+    ```
+  </Step>
+  
+  <Step title="Connectivity Testing">
+    Test network connectivity between components:
+    
+    ```bash
+    # From Logstash to Elasticsearch
+    curl -X GET "http://elasticsearch-host:9200"
+    
+    # From Wazuh agent to manager
+    telnet wazuh-manager-host 1514
+    
+    # Test all required ports from Network Setup guide
+    ```
+  </Step>
+  
+  <Step title="Data Flow Verification">
+    Confirm data flows through the pipeline:
+    
+    - Deploy test Wazuh agent and verify events in Elasticsearch
+    - Send test syslog message to Logstash and check indexing
+    - Trigger test IDS alert and verify in Wazuh dashboard
+    - Create test incident in TheHive and verify storage
+  </Step>
+  
+  <Step title="Dashboard Access">
+    Verify all web interfaces are accessible:
+    
+    - Wazuh Dashboard: `https://wazuh-host/`
+    - TheHive: `http://thehive-host:9000/`
+    - Zabbix: `http://zabbix-host/`
+    - Prometheus: `http://prometheus-host:9090/`
+    - Grafana (if deployed): `http://grafana-host:3000/`
+  </Step>
+</Steps>
+
+## Troubleshooting Common Issues
+
+<Accordion title="Elasticsearch cluster won't form">
+  **Symptoms**: Nodes don't discover each other
+  
+  **Solutions**:
+  - Verify `discovery.seed_hosts` contains all node IPs
+  - Check firewall allows port 9300 between nodes
+  - Ensure `cluster.name` is identical on all nodes
+  - Verify network connectivity: `ping` and `telnet` between nodes
+  - Check logs: `/var/log/elasticsearch/`
+</Accordion>
+
+<Accordion title="Wazuh agents not connecting">
+  **Symptoms**: Agents show as disconnected in dashboard
+  
+  **Solutions**:
+  - Verify firewall allows ports 1514 and 1515 to manager
+  - Check agent configuration: `cat /var/ossec/etc/ossec.conf`
+  - Verify manager address is correct in agent config
+  - Check manager logs: `/var/ossec/logs/ossec.log`
+  - Restart agent: `sudo systemctl restart wazuh-agent`
+</Accordion>
+
+<Accordion title="High memory usage on Elasticsearch">
+  **Symptoms**: System running out of memory
+  
+  **Solutions**:
+  - Verify JVM heap is set to 50% of system RAM (max 31 GB)
+  - Check heap settings: `/etc/elasticsearch/jvm.options`
+  - Monitor heap usage: `curl localhost:9200/_nodes/stats/jvm`
+  - Reduce replica count or index retention if needed
+  - Consider adding more nodes to distribute load
+</Accordion>
+
+<Accordion title="IDS sensor dropping packets">
+  **Symptoms**: High packet drop rate in Suricata/Snort stats
+  
+  **Solutions**:
+  - Increase AF_PACKET buffer size (Suricata)
+  - Enable multi-threading in IDS configuration
+  - Verify NIC is in promiscuous mode: `ip link show`
+  - Check if SPAN session is overloading sensor
+  - Consider hardware upgrade or additional sensors
+</Accordion>
+
+## Installation Checklist
+
+Before marking installation complete:
+
+- [ ] All components installed in correct order
+- [ ] Systemd services enabled and running
+- [ ] Inter-component connectivity verified
+- [ ] Web dashboards accessible
+- [ ] Test data flows through entire pipeline
+- [ ] High availability configured (if production)
+- [ ] Backup procedures implemented and tested
+- [ ] Firewall rules validated
+- [ ] TLS/SSL certificates installed
+- [ ] Documentation updated with actual configuration
+- [ ] Monitoring of SOC infrastructure itself enabled
+- [ ] Team trained on basic operations
+
+## Next Steps
+
+With components installed:
+
+1. Proceed to detailed [Configuration](/deployment/configuration) of each component
+2. Deploy agents and sensors to production endpoints
+3. Configure alerting rules and correlation logic
+4. Develop incident response playbooks
+5. Begin security event monitoring and tuning
+
+<Info>
+Installation is just the beginning. Plan for 2-4 weeks of tuning and optimization before considering the SOC fully operational.
+</Info>

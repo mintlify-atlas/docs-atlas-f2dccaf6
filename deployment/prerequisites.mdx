@@ -1,0 +1,339 @@
+---
+title: Deployment Prerequisites
+description: Hardware, software, and expertise requirements for deploying the Enterprise SOC Architecture
+---
+
+<Warning>
+This project is currently in the **design phase**. The following prerequisites are based on the conceptual architecture and should be used for planning purposes. Requirements may change as the implementation progresses.
+</Warning>
+
+## Overview
+
+Before deploying the Enterprise SOC Architecture, ensure you have the necessary infrastructure, software dependencies, and team expertise. This page outlines all prerequisites for a successful deployment.
+
+## Prerequisites Checklist
+
+<Steps>
+  <Step title="Review Hardware Requirements">
+    Ensure sufficient compute, memory, and storage resources are available for all SOC components.
+  </Step>
+  
+  <Step title="Validate Network Infrastructure">
+    Confirm network capacity, segmentation capabilities, and traffic mirroring support.
+  </Step>
+  
+  <Step title="Prepare Software Dependencies">
+    Install required operating systems, runtime environments, and support libraries.
+  </Step>
+  
+  <Step title="Assess Team Skills">
+    Verify team has necessary expertise in security operations, system administration, and incident response.
+  </Step>
+  
+  <Step title="Plan Storage Capacity">
+    Calculate log retention requirements and allocate appropriate storage capacity.
+  </Step>
+</Steps>
+
+## Hardware Requirements
+
+### Detection Layer (IDS/IPS)
+
+<Accordion title="Snort/Suricata IDS">
+  **Minimum Requirements per Instance:**
+  - **CPU**: 4+ cores (8+ cores recommended for high-traffic environments)
+  - **RAM**: 8 GB minimum, 16-32 GB recommended
+  - **Storage**: 500 GB for rule sets and packet captures
+  - **Network**: Dedicated monitoring NIC(s) with promiscuous mode support
+  - **OS**: Linux (Ubuntu 20.04/22.04, CentOS 8+, or RHEL 8+)
+  
+  <Note>
+  For high-throughput networks (>1 Gbps), consider multiple instances with load balancing or inline deployment on dedicated hardware.
+  </Note>
+</Accordion>
+
+### Log Aggregation and Storage
+
+<Accordion title="Logstash/Fluentd Pipeline">
+  **Minimum Requirements:**
+  - **CPU**: 4 cores minimum, 8+ cores for production
+  - **RAM**: 8 GB minimum, 16 GB recommended
+  - **Storage**: 100 GB for buffer and temporary storage
+  - **OS**: Linux (any modern distribution)
+  
+  **Scaling Considerations:**
+  - Plan for 2 GB RAM per 10,000 events/second processed
+  - Multiple pipeline instances may be required for redundancy
+</Accordion>
+
+<Accordion title="Elasticsearch Cluster">
+  **Minimum Requirements per Node:**
+  - **CPU**: 8 cores minimum, 16+ cores recommended
+  - **RAM**: 32 GB minimum, 64 GB+ recommended (50% for JVM heap)
+  - **Storage**: 2-10 TB SSD storage (depends on retention policy)
+  - **Network**: 10 Gbps network interfaces for cluster communication
+  - **OS**: Linux (Ubuntu, CentOS, RHEL)
+  
+  <Warning>
+  Plan for at least 3 nodes for production deployment to ensure high availability. Storage requirements scale with log volume and retention period.
+  </Warning>
+  
+  **Storage Calculation:**
+  - Estimate daily log volume (GB/day)
+  - Multiply by retention period (days)
+  - Add 20% overhead for indices and metadata
+  - Example: 100 GB/day × 90 days × 1.2 = 10.8 TB minimum
+</Accordion>
+
+### Infrastructure Monitoring
+
+<Accordion title="Zabbix Server">
+  **Minimum Requirements:**
+  - **CPU**: 4 cores minimum, 8 cores recommended
+  - **RAM**: 16 GB minimum, 32 GB recommended
+  - **Storage**: 500 GB for database and historical data
+  - **Database**: MySQL/PostgreSQL server (can be co-located or separate)
+  - **OS**: Linux (Ubuntu, CentOS, RHEL)
+</Accordion>
+
+<Accordion title="Prometheus Server">
+  **Minimum Requirements:**
+  - **CPU**: 4 cores minimum
+  - **RAM**: 8 GB minimum, 16 GB recommended
+  - **Storage**: 500 GB SSD for time-series data
+  - **OS**: Linux (any modern distribution)
+  
+  <Info>
+  Prometheus storage scales with number of metrics and retention period. Use the formula: `needed_disk_space = retention_time_seconds * ingested_samples_per_second * bytes_per_sample`
+  </Info>
+</Accordion>
+
+### Central Security Platform
+
+<Accordion title="Wazuh Manager">
+  **Minimum Requirements:**
+  - **CPU**: 8 cores minimum, 16+ cores recommended
+  - **RAM**: 16 GB minimum, 32 GB+ recommended
+  - **Storage**: 100 GB for Wazuh manager files
+  - **OS**: Linux (Ubuntu 20.04/22.04, CentOS 8+, RHEL 8+)
+  
+  <Note>
+  Wazuh integrates with Elasticsearch for event storage. Resource requirements scale with number of agents (plan for ~25 MB RAM per 1000 agents).
+  </Note>
+</Accordion>
+
+### Incident Response Platform
+
+<Accordion title="TheHive + Cortex">
+  **Minimum Requirements (Combined):**
+  - **CPU**: 8 cores minimum
+  - **RAM**: 16 GB minimum, 32 GB recommended
+  - **Storage**: 500 GB for case data and artifacts
+  - **Database**: Cassandra or Elasticsearch backend
+  - **OS**: Linux (Ubuntu, Debian)
+  
+  **Additional for Cortex Analyzers:**
+  - External API access for threat intelligence feeds
+  - Additional storage for analyzer outputs
+</Accordion>
+
+### Long-Term Components (Planning)
+
+<Accordion title="Honeypots (Proxmox)">
+  **Future Planning Requirements:**
+  - **Virtualization Host**: Proxmox VE server with 16+ cores, 64+ GB RAM
+  - **Storage**: 2 TB for multiple honeypot VMs
+  - **Network**: Isolated VLAN for deception infrastructure
+</Accordion>
+
+<Accordion title="OPNsense Firewall">
+  **Future Planning Requirements:**
+  - **CPU**: 4-8 cores depending on throughput
+  - **RAM**: 8 GB minimum
+  - **Network**: Multiple NICs for network segmentation
+  - **Storage**: 120 GB SSD
+</Accordion>
+
+## Network Requirements
+
+### Bandwidth Considerations
+
+| Component | Typical Bandwidth | Peak Bandwidth | Notes |
+|-----------|------------------|----------------|-------|
+| IDS/IPS (per instance) | 500 Mbps - 2 Gbps | Up to 10 Gbps | Depends on monitored network segments |
+| Log Aggregation | 100-500 Mbps | 1 Gbps | Varies with event volume |
+| Elasticsearch Cluster | 1-5 Gbps | 10 Gbps | Internal cluster communication |
+| Wazuh Agents → Manager | 10-100 Mbps | 500 Mbps | Scales with agent count |
+| Monitoring Systems | 50-200 Mbps | 500 Mbps | Metrics and alerts traffic |
+
+<Warning>
+Ensure network infrastructure can handle both normal operational traffic and peak loads during security events or bulk log ingestion.
+</Warning>
+
+### Network Capabilities Required
+
+- **Port Mirroring/SPAN**: Switch support for traffic mirroring to IDS sensors
+- **VLAN Support**: Capability to create isolated network segments
+- **Firewall Management**: Ability to configure granular firewall rules
+- **High Availability**: Redundant network paths for critical components
+
+## Software Dependencies
+
+### Operating System Requirements
+
+<Info>
+All core components support modern Linux distributions. Ubuntu 20.04/22.04 LTS or RHEL 8+ are recommended for long-term support.
+</Info>
+
+**Recommended Distributions:**
+- Ubuntu Server 20.04 LTS or 22.04 LTS
+- Red Hat Enterprise Linux 8.x or 9.x
+- CentOS Stream 8/9
+- Debian 11 or 12
+
+### Runtime Dependencies
+
+<Accordion title="Java Runtime Environment">
+  Required for: Elasticsearch, Logstash
+  - **Version**: OpenJDK 11 or 17
+  - **Installation**: Package manager or official repositories
+</Accordion>
+
+<Accordion title="Python Environment">
+  Required for: Wazuh, PyInfra automation, Cortex analyzers
+  - **Version**: Python 3.8 or higher
+  - **Packages**: pip, virtualenv
+</Accordion>
+
+<Accordion title="Database Systems">
+  Required for: Various components
+  - **MySQL/PostgreSQL**: For Zabbix and TheHive
+  - **Cassandra** (optional): For TheHive scalability
+  - **Elasticsearch**: Serves as database for multiple components
+</Accordion>
+
+<Accordion title="Container Runtime (Optional)">
+  Recommended for: Simplified deployment
+  - **Docker**: Version 20.10+
+  - **Docker Compose**: Version 2.x
+  - Alternative: Kubernetes for production-scale deployments
+</Accordion>
+
+### Additional Software
+
+- **Web Server**: Nginx or Apache for dashboard access
+- **SSL/TLS Certificates**: For secure component communication
+- **NTP Client**: For time synchronization across all systems
+- **Git**: For infrastructure-as-code version control
+
+## Skills and Expertise
+
+### Required Team Expertise
+
+<Steps>
+  <Step title="Security Operations">
+    - Incident detection and analysis
+    - Threat hunting methodologies
+    - Security event correlation
+    - SIEM platform management
+  </Step>
+  
+  <Step title="System Administration">
+    - Linux server administration
+    - Network configuration and troubleshooting
+    - Database administration (Elasticsearch, MySQL/PostgreSQL)
+    - Log management and analysis
+  </Step>
+  
+  <Step title="Network Security">
+    - IDS/IPS rule development and tuning
+    - Network traffic analysis
+    - Firewall configuration
+    - Network segmentation best practices
+  </Step>
+  
+  <Step title="Automation and Scripting">
+    - Python scripting for automation
+    - Infrastructure as Code (Terraform/PyInfra)
+    - API integration
+    - Playbook development for SOAR
+  </Step>
+  
+  <Step title="Incident Response">
+    - Incident handling procedures
+    - Forensic analysis
+    - Malware analysis basics
+    - Communication and reporting
+  </Step>
+</Steps>
+
+### Recommended Certifications
+
+<Info>
+While not mandatory, the following certifications indicate relevant expertise:
+- **Security**: CompTIA Security+, CEH, GCIH, GCIA
+- **SOC Operations**: GMON, Splunk Certified Admin/Architect
+- **Incident Response**: GCFA, GCFE, CHFI
+- **Infrastructure**: RHCSA, Linux+, Docker Certified Associate
+</Info>
+
+## Storage and Retention Planning
+
+### Log Volume Estimation
+
+Estimate your daily log volume:
+
+| Source Type | Typical Volume per Device | Multiplier | Daily Total |
+|-------------|--------------------------|------------|-------------|
+| Endpoints (Wazuh agents) | 10-50 MB/day | × endpoints | |
+| Network devices (firewall, switches) | 100-500 MB/day | × devices | |
+| Servers (application logs) | 100 MB - 2 GB/day | × servers | |
+| IDS/IPS alerts | 50-500 MB/day | × sensors | |
+
+### Retention Policy Planning
+
+<Note>
+Retention requirements vary by:
+- **Compliance regulations** (PCI DSS, HIPAA, GDPR, etc.)
+- **Operational needs** (threat hunting, investigation)
+- **Storage budget constraints**
+
+Typical retention periods:
+- Hot storage (Elasticsearch): 30-90 days
+- Warm storage (compressed): 6-12 months
+- Cold storage (archives): 1-7 years
+</Note>
+
+### Storage Architecture Recommendations
+
+- **Primary Storage**: High-performance SSD for active indices
+- **Archive Storage**: Lower-cost HDD or object storage (S3-compatible)
+- **Backup Strategy**: Regular snapshots to separate storage system
+- **Capacity Planning**: Monitor growth and plan for 20-30% annual increase
+
+## Pre-Deployment Checklist
+
+Before proceeding to deployment:
+
+- [ ] Hardware resources allocated and verified
+- [ ] Network infrastructure prepared (VLANs, port mirroring configured)
+- [ ] Operating systems installed and updated
+- [ ] Required software dependencies available
+- [ ] Team training completed or planned
+- [ ] Storage capacity calculated and provisioned
+- [ ] Backup and disaster recovery plan documented
+- [ ] Security policies and compliance requirements reviewed
+- [ ] Firewall rules and access controls planned
+- [ ] Monitoring and alerting thresholds defined
+
+## Next Steps
+
+Once all prerequisites are met:
+
+1. Review [Network Setup](/deployment/network-setup) for detailed network configuration
+2. Plan your [Component Installation](/deployment/component-installation) strategy
+3. Prepare [Configuration](/deployment/configuration) parameters for each system
+
+<Info>
+For questions about specific requirements or scaling considerations, consult the documentation for each individual component or engage with the SOC architecture planning team.
+</Info>

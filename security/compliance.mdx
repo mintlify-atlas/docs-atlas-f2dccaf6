@@ -1,0 +1,474 @@
+---
+title: 'Compliance & Audit'
+description: 'How the SOC architecture supports compliance frameworks and audit requirements'
+---
+
+## Overview
+
+The Enterprise SOC Architecture is designed to support compliance with major security and privacy frameworks. This page outlines how the architecture addresses common compliance requirements and provides guidance for audit preparation and evidence collection.
+
+<Info>
+  While the SOC architecture provides technical controls to support compliance, organizational policies and procedures are also required for full compliance with regulatory frameworks.
+</Info>
+
+## Supported Compliance Frameworks
+
+<CardGroup cols={2}>
+  <Card title="NIST Cybersecurity Framework" icon="building-shield">
+    Comprehensive framework covering Identify, Protect, Detect, Respond, and Recover functions
+  </Card>
+  
+  <Card title="ISO 27001" icon="certificate">
+    International standard for information security management systems (ISMS)
+  </Card>
+  
+  <Card title="PCI DSS" icon="credit-card">
+    Payment Card Industry Data Security Standard for organizations handling cardholder data
+  </Card>
+  
+  <Card title="GDPR" icon="shield-check">
+    General Data Protection Regulation for EU data privacy and protection
+  </Card>
+  
+  <Card title="SOC 2" icon="file-contract">
+    Service Organization Control 2 for service providers handling customer data
+  </Card>
+  
+  <Card title="HIPAA" icon="hospital">
+    Health Insurance Portability and Accountability Act for healthcare data protection
+  </Card>
+</CardGroup>
+
+## Framework Mapping
+
+### NIST Cybersecurity Framework
+
+The SOC architecture addresses all five core functions:
+
+<Accordion title="Identify (ID)">
+  **Asset Management**
+  - Wazuh agent inventory tracks all endpoints and systems
+  - Zabbix maintains infrastructure asset database
+  - Automated discovery of network devices via IDS/IPS
+  
+  **Risk Assessment**
+  - Vulnerability detection via Wazuh and integrated scanners
+  - Threat intelligence integration for emerging risks
+  - Configuration compliance monitoring
+  
+  **Governance**
+  - Centralized logging provides audit trail for policy compliance
+  - TheHive tracks security incidents and risk treatment
+  - Compliance reporting dashboards in Wazuh
+</Accordion>
+
+<Accordion title="Protect (PR)">
+  **Access Control**
+  - Identity and authentication logging from all systems
+  - Privileged access monitoring and alerting
+  - Failed authentication detection and alerting
+  
+  **Awareness and Training**
+  - Security event dashboards for awareness
+  - Incident case studies via TheHive
+  
+  **Data Security**
+  - File integrity monitoring (FIM) via Wazuh
+  - Encryption monitoring and validation
+  - Data loss prevention (DLP) event collection
+  
+  **Protective Technology**
+  - IDS/IPS protection (Snort/Suricata)
+  - Endpoint protection monitoring via Wazuh
+  - Firewall log analysis and correlation
+</Accordion>
+
+<Accordion title="Detect (DE)">
+  **Anomalies and Events**
+  - Multi-layer threat detection (network, endpoint, infrastructure)
+  - Behavioral analytics and correlation in Wazuh
+  - Performance and availability anomaly detection
+  
+  **Security Continuous Monitoring**
+  - 24/7 log collection and analysis
+  - Real-time alerting via Prometheus and Wazuh
+  - Threat intelligence integration
+  
+  **Detection Processes**
+  - Centralized detection rule management
+  - Regular rule updates from threat intelligence
+  - Detection testing and validation processes
+</Accordion>
+
+<Accordion title="Respond (RS)">
+  **Response Planning**
+  - TheHive incident response case management
+  - Documented response playbooks and procedures
+  - Automated response via Cortex SOAR
+  
+  **Communications**
+  - Incident tracking and notifications via TheHive
+  - Stakeholder reporting and dashboards
+  - Integration with communication platforms
+  
+  **Analysis**
+  - Centralized log analysis in Elasticsearch
+  - Forensic data collection and preservation
+  - Root cause analysis capabilities
+  
+  **Mitigation**
+  - Automated containment actions via Cortex
+  - Coordination of mitigation activities in TheHive
+  - Mitigation effectiveness tracking
+</Accordion>
+
+<Accordion title="Recover (RC)">
+  **Recovery Planning**
+  - Incident recovery tracking in TheHive
+  - Infrastructure recovery monitoring via Zabbix
+  - Service restoration validation
+  
+  **Improvements**
+  - Lessons learned documentation
+  - Detection gap analysis and improvement
+  - Metrics and KPI tracking for continuous improvement
+  
+  **Communications**
+  - Stakeholder updates during recovery
+  - Post-incident reporting
+  - Recovery status dashboards
+</Accordion>
+
+### ISO 27001 Controls
+
+Key ISO 27001 controls addressed by the SOC architecture:
+
+| Control Area | Control | SOC Component | Implementation |
+|--------------|---------|---------------|----------------|
+| A.12.4 | Logging and Monitoring | Wazuh, Elasticsearch | Centralized logging of security events |
+| A.12.6 | Technical Vulnerability Management | Wazuh | Vulnerability detection and tracking |
+| A.16.1 | Incident Management | TheHive | Incident detection, response, and documentation |
+| A.12.2 | Protection from Malware | Wazuh, Snort/Suricata | Multi-layer malware detection |
+| A.13.1 | Network Security | IDS/IPS, Firewall logs | Network traffic monitoring and analysis |
+| A.9.4 | System and Application Access Control | Wazuh | Access logging and monitoring |
+| A.12.3 | Backup | Elasticsearch, Configurations | Log retention and backup capabilities |
+| A.18.2 | Compliance Monitoring | Wazuh | Compliance reporting and dashboards |
+
+### PCI DSS Requirements
+
+<CardGroup cols={2}>
+  <Card title="Requirement 10" icon="list-check">
+    **Track and monitor all access to network resources and cardholder data**
+    
+    - All access logged to Elasticsearch
+    - Real-time monitoring via Wazuh
+    - Audit trail protection via log integrity checking
+    - Automated log review and alerting
+  </Card>
+  
+  <Card title="Requirement 11" icon="magnifying-glass">
+    **Regularly test security systems and processes**
+    
+    - IDS/IPS monitoring (Snort/Suricata)
+    - File integrity monitoring (Wazuh FIM)
+    - Vulnerability detection
+    - Security testing documentation in TheHive
+  </Card>
+  
+  <Card title="Requirement 6" icon="code">
+    **Develop and maintain secure systems**
+    
+    - Configuration monitoring
+    - Vulnerability tracking
+    - Change detection and alerting
+    - Patch compliance monitoring
+  </Card>
+  
+  <Card title="Requirement 12" icon="book">
+    **Maintain a policy that addresses information security**
+    
+    - Security incident tracking (TheHive)
+    - Policy violation detection
+    - Compliance reporting dashboards
+    - Security awareness metrics
+  </Card>
+</CardGroup>
+
+<Warning>
+  PCI DSS requires log retention of at least one year, with three months immediately available. Configure Elasticsearch retention policies accordingly.
+</Warning>
+
+### GDPR Compliance
+
+The SOC architecture supports GDPR requirements:
+
+<Accordion title="Article 32: Security of Processing">
+  - **Encryption**: Monitor encryption implementation and compliance
+  - **Confidentiality**: Access control monitoring and alerting
+  - **Integrity**: File integrity monitoring and change detection
+  - **Availability**: Infrastructure monitoring via Zabbix/Prometheus
+  - **Resilience**: Incident detection and response capabilities
+  - **Testing**: Regular security testing tracked in TheHive
+</Accordion>
+
+<Accordion title="Article 33: Breach Notification">
+  - **Detection**: Multi-layer threat detection for early breach identification
+  - **Documentation**: Incident tracking and documentation in TheHive
+  - **Timeline**: Automated alerting for rapid detection (< 72 hours)
+  - **Evidence**: Comprehensive logs for breach investigation
+  - **Reporting**: Incident reports generated from TheHive
+</Accordion>
+
+<Accordion title="Article 30: Records of Processing Activities">
+  - **Audit Logs**: Comprehensive logging of all data processing activities
+  - **Access Tracking**: Who accessed what data and when
+  - **Retention**: Configurable log retention policies
+  - **Reporting**: Compliance reports for processing activities
+</Accordion>
+
+<Note>
+  Ensure personally identifiable information (PII) in logs is properly protected, pseudonymized, or encrypted to maintain GDPR compliance.
+</Note>
+
+## Audit Logging and Reporting
+
+### Comprehensive Audit Trail
+
+The SOC architecture provides comprehensive audit logging across all layers:
+
+<CardGroup cols={3}>
+  <Card title="User Activity" icon="user">
+    - Authentication events
+    - Authorization changes
+    - Data access
+    - Configuration changes
+  </Card>
+  
+  <Card title="System Activity" icon="server">
+    - Process execution
+    - Network connections
+    - File modifications
+    - Service changes
+  </Card>
+  
+  <Card title="Security Events" icon="shield">
+    - Threat detections
+    - Policy violations
+    - Security incidents
+    - Response actions
+  </Card>
+</CardGroup>
+
+### Audit Log Requirements
+
+<Info>
+  All audit logs should include: timestamp, user/system identity, event type, affected resource, source IP/system, and outcome (success/failure).
+</Info>
+
+Implementation details:
+
+1. **Collection**: Logstash/Fluentd aggregate logs from all sources
+2. **Storage**: Elasticsearch provides searchable, indexed log storage
+3. **Retention**: Configurable retention based on compliance requirements
+4. **Protection**: Log integrity verification and immutable storage options
+5. **Access Control**: Role-based access to audit logs
+6. **Review**: Automated analysis and manual review capabilities
+
+### Log Retention Requirements
+
+| Framework | Minimum Retention | Recommended Retention | SOC Implementation |
+|-----------|-------------------|----------------------|--------------------|
+| PCI DSS | 1 year (3 months online) | 2+ years | Elasticsearch with hot/warm/cold tiers |
+| SOC 2 | 1 year | 2+ years | Configurable per index |
+| HIPAA | 6 years | 7+ years | Archive to object storage |
+| GDPR | As necessary | Based on purpose | Configurable with automated deletion |
+| ISO 27001 | As defined in policy | 1-3 years | Configurable retention policies |
+
+<Tip>
+  Implement Elasticsearch Index Lifecycle Management (ILM) to automatically transition logs from hot to warm to cold storage based on retention requirements.
+</Tip>
+
+## Evidence Collection and Retention
+
+### Forensic Evidence
+
+TheHive provides incident case management with comprehensive evidence collection:
+
+<Accordion title="Evidence Types">
+  - **Log Evidence**: Relevant logs automatically attached to incidents
+  - **Network Captures**: PCAP files from IDS/IPS systems
+  - **File Artifacts**: Suspicious files and malware samples
+  - **Screenshots**: Visual evidence of security events
+  - **Third-party Data**: Threat intelligence and external reports
+  - **Timeline Data**: Chronological event reconstruction
+</Accordion>
+
+<Accordion title="Chain of Custody">
+  - All evidence tagged with collector, timestamp, and hash
+  - Evidence integrity verification via checksums
+  - Access logging for all evidence viewing and modification
+  - Immutable evidence storage options
+  - Evidence retention and disposal tracking
+</Accordion>
+
+<Accordion title="Evidence Storage">
+  - Encrypted storage for sensitive evidence
+  - Access controls based on case sensitivity
+  - Long-term archival for legal retention
+  - Backup and disaster recovery for evidence
+  - Secure deletion after retention period
+</Accordion>
+
+### Compliance Reporting
+
+<CardGroup cols={2}>
+  <Card title="Automated Reports" icon="file-lines">
+    - Scheduled compliance reports from Wazuh
+    - Custom dashboards for each framework
+    - Metric tracking and trend analysis
+    - Export capabilities (PDF, CSV, JSON)
+  </Card>
+  
+  <Card title="Manual Reports" icon="pen-to-square">
+    - Ad-hoc queries in Elasticsearch
+    - Incident summaries from TheHive
+    - Custom analysis and investigations
+    - Executive summaries and briefings
+  </Card>
+</CardGroup>
+
+## Audit Preparation
+
+### Pre-Audit Checklist
+
+<Warning>
+  Begin audit preparation at least 30 days before the scheduled audit date to allow time for remediation of any identified gaps.
+</Warning>
+
+- [ ] Verify all SOC components are operational and collecting logs
+- [ ] Review and update compliance dashboard configurations
+- [ ] Validate log retention meets requirements
+- [ ] Test log search and retrieval capabilities
+- [ ] Review and update security policies and procedures
+- [ ] Prepare evidence of security testing (penetration tests, vulnerability scans)
+- [ ] Document any exceptions or compensating controls
+- [ ] Prepare access for auditors (read-only accounts)
+- [ ] Generate sample compliance reports
+- [ ] Review incident response documentation
+
+### Common Audit Queries
+
+Prepare these common audit evidence queries in advance:
+
+<Accordion title="Access Control Evidence">
+  ```
+  - All authentication failures in past 90 days
+  - Privileged access events (sudo, admin logins)
+  - Account creation and deletion events
+  - Permission changes and role assignments
+  - Failed authorization attempts
+  ```
+</Accordion>
+
+<Accordion title="Security Event Evidence">
+  ```
+  - All critical/high severity alerts
+  - Malware detection events
+  - Intrusion attempts and blocks
+  - Policy violation events
+  - Security incidents and response actions
+  ```
+</Accordion>
+
+<Accordion title="System Change Evidence">
+  ```
+  - Configuration changes to critical systems
+  - Software installation and updates
+  - File integrity monitoring alerts
+  - Patch deployment records
+  - Firewall rule changes
+  ```
+</Accordion>
+
+<Accordion title="Monitoring Evidence">
+  ```
+  - Uptime and availability metrics
+  - Log collection statistics
+  - Alert response times
+  - Detection coverage metrics
+  - System health indicators
+  ```
+</Accordion>
+
+## Continuous Compliance
+
+<Info>
+  Compliance is not a one-time activity. Implement continuous compliance monitoring to maintain audit readiness year-round.
+</Info>
+
+### Continuous Monitoring Approach
+
+1. **Automated Compliance Checks**: Daily automated verification of compliance controls
+2. **Dashboards**: Real-time compliance status visibility
+3. **Alerting**: Immediate notification of compliance violations
+4. **Regular Reviews**: Monthly compliance review meetings
+5. **Gap Remediation**: Tracking and closure of identified gaps
+6. **Documentation**: Continuous documentation of controls and evidence
+
+### Compliance Metrics
+
+Track these key compliance metrics:
+
+| Metric | Target | Description |
+|--------|--------|-------------|
+| Log Collection Rate | > 99.5% | Percentage of expected logs successfully collected |
+| Detection Coverage | > 90% | Percentage of required controls with active monitoring |
+| Incident Response Time | < 24 hours | Time from detection to initial response |
+| Audit Finding Closure | 100% in 30 days | Percentage of audit findings remediated within SLA |
+| Control Effectiveness | > 95% | Percentage of controls operating effectively |
+| Compliance Assessment Score | > 85% | Overall compliance score from automated assessments |
+
+<Tip>
+  Create dedicated compliance dashboards in Wazuh showing real-time status of key compliance metrics for each framework you need to support.
+</Tip>
+
+## Data Privacy Considerations
+
+### Privacy-by-Design
+
+Implement privacy considerations in the SOC architecture:
+
+- **Data Minimization**: Only collect logs necessary for security purposes
+- **Pseudonymization**: Replace PII with pseudonyms where possible
+- **Access Controls**: Restrict access to logs containing PII
+- **Retention Limits**: Automatically delete logs after retention period
+- **Purpose Limitation**: Use logs only for security purposes
+- **Transparency**: Document what data is collected and why
+
+### Sensitive Data Handling
+
+<Warning>
+  Ensure logs do not contain passwords, credit card numbers, or other highly sensitive data. Implement filtering and masking where necessary.
+</Warning>
+
+Best practices:
+
+1. **Filter Sensitive Data**: Remove/mask sensitive fields during log collection
+2. **Encrypt in Transit**: TLS for all log transmission
+3. **Encrypt at Rest**: Enable Elasticsearch encryption for indices with PII
+4. **Access Logging**: Audit all access to logs containing sensitive data
+5. **Data Subject Rights**: Implement processes for data subject access requests (DSAR)
+
+## Conclusion
+
+The Enterprise SOC Architecture provides comprehensive technical controls to support compliance with major security and privacy frameworks. However, compliance also requires:
+
+- Documented policies and procedures
+- Regular security awareness training
+- Risk assessment and treatment processes
+- Third-party vendor management
+- Business continuity and disaster recovery planning
+
+<Note>
+  Work with your legal and compliance teams to ensure organizational policies and procedures complement the technical controls provided by the SOC architecture.
+</Note>

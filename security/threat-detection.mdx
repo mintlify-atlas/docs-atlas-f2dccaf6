@@ -1,0 +1,249 @@
+---
+title: 'Threat Detection'
+description: 'Comprehensive threat detection across all layers of the SOC architecture'
+---
+
+## Overview
+
+The Enterprise SOC Architecture implements a multi-layered threat detection strategy that provides comprehensive visibility across network, endpoint, and infrastructure layers. This approach ensures that threats are identified quickly and accurately, enabling rapid response to security incidents.
+
+## Detection Layers
+
+<CardGroup cols={2}>
+  <Card title="Network-Based Detection" icon="network-wired">
+    IDS/IPS systems (Snort & Suricata) monitor all network traffic from endpoints, detecting suspicious patterns and known attack signatures in real-time.
+  </Card>
+  
+  <Card title="Endpoint Detection" icon="desktop">
+    Wazuh agents provide EDR capabilities, monitoring file integrity, system calls, registry changes, and process execution on endpoints.
+  </Card>
+  
+  <Card title="Infrastructure Monitoring" icon="server">
+    Zabbix and Prometheus track system health, performance anomalies, and unusual resource consumption patterns that may indicate compromise.
+  </Card>
+  
+  <Card title="Behavioral Analysis" icon="chart-line">
+    Correlation engines in Wazuh analyze patterns across multiple data sources to identify advanced threats and lateral movement.
+  </Card>
+</CardGroup>
+
+## Threat Categories
+
+### Network-Based Threats
+
+<CardGroup cols={2}>
+  <Card title="Intrusion Attempts" icon="shield-halved">
+    - Port scanning and reconnaissance
+    - Brute force authentication attacks
+    - Exploitation attempts against known vulnerabilities
+    - Command and control (C2) communications
+  </Card>
+  
+  <Card title="Malicious Traffic" icon="bug">
+    - Malware download attempts
+    - Data exfiltration patterns
+    - DDoS attack traffic
+    - Protocol abuse and tunneling
+  </Card>
+</CardGroup>
+
+### Endpoint-Based Threats
+
+<CardGroup cols={2}>
+  <Card title="Malware & Ransomware" icon="virus">
+    - Known malware signatures
+    - Suspicious file modifications
+    - Encryption behaviors
+    - Unauthorized process execution
+  </Card>
+  
+  <Card title="Insider Threats" icon="user-secret">
+    - Privilege escalation attempts
+    - Unauthorized access to sensitive data
+    - Suspicious user behavior patterns
+    - Policy violations
+  </Card>
+</CardGroup>
+
+### Infrastructure Threats
+
+<CardGroup cols={2}>
+  <Card title="System Anomalies" icon="triangle-exclamation">
+    - Unusual resource consumption
+    - Unexpected service failures
+    - Configuration changes
+    - Unauthorized software installation
+  </Card>
+  
+  <Card title="Supply Chain Risks" icon="link">
+    - Compromised dependencies
+    - Unauthorized system updates
+    - Third-party access violations
+    - Shadow IT detection
+  </Card>
+</CardGroup>
+
+## Detection Rule Development
+
+<Info>
+  Detection rules should be continuously refined based on threat intelligence, incident analysis, and environmental changes.
+</Info>
+
+### Rule Creation Process
+
+1. **Threat Research**: Analyze current threat landscape and emerging attack techniques
+2. **Signature Development**: Create detection signatures for Snort/Suricata
+3. **Behavioral Rules**: Develop correlation rules in Wazuh for complex attack patterns
+4. **Testing**: Validate rules in a test environment to ensure effectiveness
+5. **Deployment**: Roll out rules to production with appropriate tuning
+6. **Monitoring**: Track rule performance and detection accuracy
+
+### Rule Types
+
+| Rule Type | Platform | Use Case | Example |
+|-----------|----------|----------|----------|
+| Signature-based | Snort/Suricata | Known attack patterns | CVE exploits, malware signatures |
+| Anomaly-based | Wazuh | Behavioral deviations | Unusual login times, abnormal data access |
+| Correlation-based | Wazuh | Multi-stage attacks | APT detection, lateral movement |
+| Threshold-based | Prometheus | Resource abuse | Failed login attempts, traffic spikes |
+
+<Warning>
+  Overly broad detection rules can generate excessive false positives. Always balance detection sensitivity with operational efficiency.
+</Warning>
+
+## False Positive Management
+
+Effective false positive management is critical to maintaining analyst efficiency and preventing alert fatigue.
+
+### Identification Strategies
+
+<Accordion title="Baseline Normal Behavior">
+  Establish baselines for normal network traffic, user behavior, and system operations. Deviations from baseline that are legitimate should be documented and tuned.
+  
+  - Monitor for recurring false positives
+  - Analyze legitimate business processes that trigger alerts
+  - Document approved exceptions
+</Accordion>
+
+<Accordion title="Rule Tuning">
+  Continuously refine detection rules based on false positive analysis:
+  
+  - Add whitelists for known-good traffic
+  - Adjust detection thresholds
+  - Implement time-based exceptions
+  - Use context-aware rules
+</Accordion>
+
+<Accordion title="Feedback Loop">
+  Implement a feedback mechanism where analysts can mark false positives:
+  
+  - Track false positive rates per rule
+  - Regular review sessions with security team
+  - Automated tuning recommendations
+  - Documentation of tuning decisions
+</Accordion>
+
+<Accordion title="Suppression Rules">
+  Create suppression rules for known false positive scenarios:
+  
+  - Maintenance windows
+  - Approved security tools
+  - Testing environments
+  - Known benign applications
+</Accordion>
+
+### Best Practices
+
+<Tip>
+  Maintain a false positive rate below 10% to ensure analyst effectiveness. Higher rates lead to alert fatigue and missed threats.
+</Tip>
+
+- **Regular Review**: Schedule weekly reviews of high-volume alerts
+- **Prioritization**: Focus tuning efforts on high-frequency, low-severity alerts
+- **Documentation**: Maintain a knowledge base of tuning decisions
+- **Metrics**: Track false positive rates as a key performance indicator
+
+## Threat Intelligence Integration
+
+Threat intelligence enhances detection capabilities by providing context about emerging threats, attack techniques, and known malicious indicators.
+
+### Intelligence Sources
+
+<CardGroup cols={3}>
+  <Card title="Commercial Feeds" icon="building">
+    Paid threat intelligence services providing high-quality, curated indicators
+  </Card>
+  
+  <Card title="Open Source" icon="globe">
+    Community-driven feeds like MISP, AlienVault OTX, and abuse.ch
+  </Card>
+  
+  <Card title="Internal Intelligence" icon="database">
+    Indicators derived from past incidents and internal research
+  </Card>
+</CardGroup>
+
+### Integration Points
+
+1. **IDS/IPS Rule Updates**: Automatically update Snort/Suricata rules with new signatures
+2. **IP Reputation**: Feed malicious IP addresses to firewall and detection systems
+3. **Domain Blacklists**: Block known malicious domains at DNS and proxy level
+4. **File Hashes**: Match known malware hashes in endpoint detection
+5. **TTPs**: Update behavioral detection rules based on adversary tactics
+
+<Note>
+  Threat intelligence should be consumed from multiple sources and correlated to improve accuracy and reduce false positives from low-quality feeds.
+</Note>
+
+### Implementation Workflow
+
+```
+1. Ingest → Threat intelligence feeds collected from multiple sources
+2. Normalize → Convert to standardized format (STIX/TAXII)
+3. Validate → Score and verify intelligence quality
+4. Enrich → Add context and relevance scoring
+5. Distribute → Push to detection systems (Snort, Suricata, Wazuh)
+6. Monitor → Track detection efficacy and update feeds
+```
+
+### Intelligence-Driven Detection
+
+<Info>
+  Use threat intelligence to prioritize detection and response efforts based on current threat actor activity and campaigns.
+</Info>
+
+- **Campaign Tracking**: Monitor for indicators related to active threat campaigns
+- **Actor Attribution**: Identify threat actors based on TTPs and infrastructure
+- **Vulnerability Prioritization**: Focus on vulnerabilities actively exploited in the wild
+- **Proactive Hunting**: Use intelligence to guide threat hunting activities
+
+## Detection Performance Metrics
+
+Track these key metrics to measure detection effectiveness:
+
+| Metric | Target | Description |
+|--------|--------|-------------|
+| Mean Time to Detect (MTTD) | < 1 hour | Average time from compromise to detection |
+| False Positive Rate | < 10% | Percentage of alerts that are false positives |
+| Coverage | > 90% | Percentage of MITRE ATT&CK techniques covered |
+| Detection Accuracy | > 95% | Percentage of true threats correctly identified |
+| Alert Volume | Baseline +/- 20% | Daily alert volume trends |
+
+<Tip>
+  Regularly test detection capabilities using attack simulation tools and red team exercises to validate coverage and identify gaps.
+</Tip>
+
+## Continuous Improvement
+
+Threat detection is an iterative process that requires continuous refinement:
+
+1. **Incident Review**: Analyze detection performance after each incident
+2. **Gap Analysis**: Identify attacks that were not detected
+3. **Rule Enhancement**: Develop new rules to address detection gaps
+4. **Testing**: Validate improvements in test environment
+5. **Deployment**: Implement enhanced detection capabilities
+6. **Monitoring**: Track effectiveness of new detections
+
+<Warning>
+  Never deploy untested detection rules directly to production. Always validate in a test environment first.
+</Warning>

@@ -1,0 +1,579 @@
+---
+title: "Incident Handling"
+description: "Comprehensive incident response procedures, case management, and escalation workflows for the SOC"
+---
+
+# Incident Handling
+
+This guide outlines the complete incident response lifecycle for the Enterprise SOC, from initial detection through post-incident review. It covers the use of TheHive for case management, escalation procedures, and best practices for effective incident response.
+
+## Incident Response Workflow
+
+<Steps>
+  <Step title="Detection and Identification">
+    Identify potential security incidents through:
+    - Automated alerts from Wazuh, Snort, Suricata
+    - Threat hunting activities
+    - User reports
+    - Third-party notifications
+    
+    **Key Actions:**
+    - Acknowledge the alert in monitoring system
+    - Perform initial triage to confirm it's a genuine incident
+    - Gather preliminary information (affected systems, timeline, indicators)
+  </Step>
+  
+  <Step title="Incident Classification">
+    Classify the incident by:
+    - **Type**: Malware, unauthorized access, data breach, DDoS, insider threat, etc.
+    - **Severity**: Critical, High, Medium, Low
+    - **Scope**: Single endpoint, multiple systems, network-wide
+    - **Impact**: Confidentiality, integrity, availability
+    
+    **Create TheHive Case:**
+    - Open new case with descriptive title
+    - Set appropriate severity and TLP
+    - Assign to appropriate analyst
+    - Add initial observables (IPs, domains, hashes)
+  </Step>
+  
+  <Step title="Containment">
+    Implement containment measures to prevent spread:
+    
+    **Short-term Containment:**
+    - Isolate affected systems from network
+    - Block malicious IPs/domains at firewall
+    - Disable compromised user accounts
+    - Implement emergency firewall rules
+    
+    **Long-term Containment:**
+    - Apply temporary patches or workarounds
+    - Segment network to limit lateral movement
+    - Enhanced monitoring of related systems
+    - Prepare for eradication phase
+  </Step>
+  
+  <Step title="Investigation and Analysis">
+    Conduct thorough investigation:
+    - Collect forensic evidence from affected systems
+    - Analyze logs in Elasticsearch for full attack timeline
+    - Review Wazuh EDR data for endpoint artifacts
+    - Examine IDS/IPS logs for network indicators
+    - Identify root cause and attack vector
+    - Determine full scope of compromise
+    - Document all findings in TheHive
+    
+    **Use Cortex Analyzers:**
+    - Analyze file hashes with VirusTotal
+    - Check IP reputation with AbuseIPDB
+    - Investigate domains with passive DNS
+    - Extract IOCs automatically
+  </Step>
+  
+  <Step title="Eradication">
+    Remove threat from environment:
+    - Remove malware from infected systems
+    - Delete unauthorized accounts or access
+    - Close exploited vulnerabilities
+    - Update security controls (IDS rules, firewall policies)
+    - Verify complete removal of threat
+    
+    **Verify Eradication:**
+    - Scan systems with updated antivirus
+    - Search logs for indicators of persistence
+    - Monitor for reinfection attempts
+  </Step>
+  
+  <Step title="Recovery">
+    Restore normal operations:
+    - Restore systems from clean backups if necessary
+    - Rebuild compromised systems from known-good images
+    - Reset credentials for affected accounts
+    - Gradually restore services with enhanced monitoring
+    - Verify business operations are normal
+    - Continue monitoring for 72+ hours post-recovery
+  </Step>
+  
+  <Step title="Post-Incident Review">
+    Conduct lessons learned session:
+    - Document complete incident timeline
+    - Analyze response effectiveness
+    - Identify improvements for detection and response
+    - Update playbooks and procedures
+    - Share findings with stakeholders
+    - Implement preventive measures
+    - Close TheHive case with final report
+  </Step>
+</Steps>
+
+## Using TheHive for Case Management
+
+### Creating a New Case
+
+<Steps>
+  <Step title="Access TheHive">
+    Navigate to TheHive web interface and authenticate
+  </Step>
+  
+  <Step title="Create New Case">
+    Click "New Case" and fill in required fields:
+    - **Title**: Descriptive incident name (e.g., "Malware Detection on HR-WKS-042")
+    - **Severity**: Critical/High/Medium/Low
+    - **TLP**: Traffic Light Protocol classification (Red/Amber/Green/White)
+    - **PAP**: Permissible Actions Protocol
+    - **Description**: Detailed incident summary
+    - **Tags**: Categorization tags (malware, phishing, data-breach, etc.)
+  </Step>
+  
+  <Step title="Add Observables">
+    Add indicators of compromise:
+    - IP addresses (source and destination)
+    - Domain names
+    - File hashes (MD5, SHA1, SHA256)
+    - Email addresses
+    - URLs
+    - Filenames
+    - Registry keys
+    - User accounts
+    
+    Mark observables as IOCs for threat intelligence sharing
+  </Step>
+  
+  <Step title="Create Tasks">
+    Break down response into tasks:
+    - Initial triage
+    - Forensic collection
+    - Malware analysis
+    - Containment actions
+    - Communication with stakeholders
+    - Documentation
+    
+    Assign tasks to team members with due dates
+  </Step>
+</Steps>
+
+<Info>
+TheHive integrates automatically with Wazuh for high-severity alerts. Configure alert thresholds to auto-create cases for critical events.
+</Info>
+
+### Using Cortex for Analysis
+
+Cortex provides automated analysis and response capabilities:
+
+<CardGroup cols={2}>
+  <Card title="Threat Intelligence" icon="shield-halved">
+    Query multiple threat intel sources (VirusTotal, AbuseIPDB, OTX) for observable reputation
+  </Card>
+  <Card title="File Analysis" icon="file-magnifying-glass">
+    Analyze suspicious files with sandboxes and static analysis tools
+  </Card>
+  <Card title="Domain Investigation" icon="globe">
+    Perform WHOIS, passive DNS, and reputation checks on domains
+  </Card>
+  <Card title="Response Actions" icon="bolt">
+    Execute automated containment through responders (block IP, quarantine endpoint)
+  </Card>
+</CardGroup>
+
+**Running Analyzers:**
+
+1. Select an observable in TheHive case
+2. Click "Run Analyzers"
+3. Choose relevant analyzers (e.g., VirusTotal for hash, MaxMind for IP)
+4. Review analyzer reports when complete
+5. Use results to inform investigation decisions
+
+**Common Analyzers:**
+- **VirusTotal_GetReport**: Check file/URL/domain/IP reputation
+- **AbuseIPDB**: IP address abuse history
+- **Shodan**: Internet exposure analysis
+- **MaxMind**: IP geolocation
+- **MISP**: Query MISP threat intelligence platform
+
+### Case Documentation Best Practices
+
+<Warning>
+Thorough documentation is critical for legal, compliance, and learning purposes. Document as you investigate, not after.
+</Warning>
+
+**What to Document:**
+
+1. **Timeline**: Precise timestamps for all events and actions
+2. **Evidence**: Screenshots, log excerpts, forensic artifacts
+3. **Analysis**: Your thought process and investigative steps
+4. **Actions Taken**: Every containment, eradication, and recovery action
+5. **Communications**: Stakeholder notifications and approvals
+6. **Outcomes**: Resolution status and lessons learned
+
+**Documentation Template:**
+
+```markdown
+## Incident Summary
+- Date/Time Detected: [timestamp]
+- Detected By: [alert/analyst/user report]
+- Affected Systems: [list]
+- Incident Type: [malware/breach/etc]
+- Current Status: [contained/investigating/resolved]
+
+## Timeline
+- [timestamp]: Initial detection via [source]
+- [timestamp]: Case created, assigned to [analyst]
+- [timestamp]: Containment action - [description]
+- [timestamp]: [additional events]
+
+## Technical Analysis
+[Detailed findings, IOCs, attack chain]
+
+## Response Actions
+[List of all actions taken]
+
+## Impact Assessment
+[Business impact, data affected, downtime]
+
+## Recommendations
+[Preventive measures, improvements]
+```
+
+## Incident Severity Classification
+
+<Accordion title="Critical Severity">
+  **Criteria:**
+  - Active data exfiltration in progress
+  - Ransomware encryption of critical systems
+  - Complete compromise of domain controller or core infrastructure
+  - Confirmed APT or nation-state activity
+  - Public-facing breach with customer data exposure
+  
+  **Response SLA:** Immediate (within 15 minutes)
+  
+  **Escalation:** Notify SOC Manager, CISO, and executive leadership immediately
+  
+  **Resources:** Full team mobilization, consider external incident response support
+</Accordion>
+
+<Accordion title="High Severity">
+  **Criteria:**
+  - Malware detected on multiple systems
+  - Successful exploitation of critical vulnerability
+  - Unauthorized access to sensitive data
+  - Privilege escalation to administrative level
+  - Confirmed command and control communication
+  
+  **Response SLA:** Within 30 minutes
+  
+  **Escalation:** Notify SOC Manager and relevant system owners
+  
+  **Resources:** Senior analyst assignment, potential Tier 2/3 involvement
+</Accordion>
+
+<Accordion title="Medium Severity">
+  **Criteria:**
+  - Malware detected on isolated endpoint
+  - Suspicious activity requiring investigation
+  - Policy violations with security implications
+  - Failed exploitation attempts
+  - Anomalous network traffic
+  
+  **Response SLA:** Within 2 hours
+  
+  **Escalation:** SOC Team Lead notification
+  
+  **Resources:** Standard analyst response
+</Accordion>
+
+<Accordion title="Low Severity">
+  **Criteria:**
+  - Minor policy violations
+  - Informational security events
+  - False positive confirmation
+  - Routine security operations
+  
+  **Response SLA:** Within 8 hours or next business day
+  
+  **Escalation:** Document in ticketing system
+  
+  **Resources:** Standard triage and documentation
+</Accordion>
+
+## Escalation Procedures
+
+### When to Escalate
+
+<Steps>
+  <Step title="Tier 1 to Tier 2 Escalation">
+    Escalate when:
+    - Incident complexity exceeds Tier 1 capabilities
+    - Deep forensic analysis required
+    - Advanced malware analysis needed
+    - Incident duration exceeds 4 hours without resolution
+    - Multiple systems affected
+    
+    **Process:**
+    1. Document all findings in TheHive
+    2. Assign case to Tier 2 queue
+    3. Provide verbal briefing to Tier 2 analyst
+    4. Remain available for questions
+  </Step>
+  
+  <Step title="Tier 2 to Tier 3 / Management Escalation">
+    Escalate when:
+    - Critical infrastructure compromised
+    - Data breach confirmed or suspected
+    - Legal or regulatory implications
+    - External support needed (vendors, law enforcement)
+    - Incident declared as "major incident"
+    
+    **Process:**
+    1. Update TheHive case with severity increase
+    2. Notify SOC Manager via phone/SMS
+    3. Prepare executive summary
+    4. Join incident bridge call if activated
+  </Step>
+  
+  <Step title="External Escalation">
+    Escalate externally when:
+    - Law enforcement involvement required
+    - Regulatory reporting obligations (GDPR, HIPAA, etc.)
+    - Customer notification needed
+    - Vendor/partner notification required
+    - Cyber insurance claim activation
+    
+    **Process:**
+    1. Obtain management approval
+    2. Follow legal/compliance notification procedures
+    3. Coordinate with public relations if media involved
+    4. Document all external communications
+  </Step>
+</Steps>
+
+<Warning>
+Never delay escalation to avoid appearing incapable. Early escalation of serious incidents is professional and expected.
+</Warning>
+
+### Escalation Contact Matrix
+
+| Severity | Initial Contact | Timeframe | Additional Notifications |
+|----------|----------------|-----------|-------------------------|
+| **Critical** | SOC Manager + CISO | Immediate | Executive team, Legal, PR |
+| **High** | SOC Manager | Within 30 min | System owners, IT Management |
+| **Medium** | SOC Team Lead | Within 2 hours | Affected department heads |
+| **Low** | Document in system | Next business day | None required |
+
+## Incident Response Playbooks
+
+### Malware Incident
+
+<Steps>
+  <Step title="Immediate Actions">
+    1. Isolate infected system from network (disconnect network cable or disable in firewall)
+    2. Create TheHive case with malware sample hash
+    3. Run Cortex analyzers on file hash (VirusTotal, reverse.it)
+    4. Identify other systems with same IOCs using Wazuh/Elasticsearch
+  </Step>
+  
+  <Step title="Containment">
+    1. Block C2 domains/IPs at firewall and DNS
+    2. Update IDS/IPS signatures for detection
+    3. Push Wazuh rule to detect malware across all endpoints
+    4. Search for related IOCs (file paths, registry keys, network connections)
+  </Step>
+  
+  <Step title="Eradication">
+    1. Run full antivirus scan with updated signatures
+    2. Remove malware files and persistence mechanisms
+    3. Reset credentials for accounts used on infected system
+    4. Apply missing patches that may have been exploited
+  </Step>
+  
+  <Step title="Recovery">
+    1. Verify malware removal with clean scan
+    2. Monitor system for 24-48 hours before returning to production
+    3. Restore from backup if system heavily compromised
+    4. Update Wazuh FIM rules to detect similar intrusions
+  </Step>
+</Steps>
+
+### Phishing Incident
+
+<Steps>
+  <Step title="Initial Response">
+    1. Obtain copy of phishing email (forward as attachment to preserve headers)
+    2. Create TheHive case with email observables (sender, URLs, attachments)
+    3. Check if users clicked links or opened attachments
+    4. Search email logs for other recipients
+  </Step>
+  
+  <Step title="Containment">
+    1. Block sender address and domain at email gateway
+    2. Delete phishing emails from all mailboxes
+    3. Block malicious URLs in web proxy/firewall
+    4. Reset credentials for users who entered passwords
+  </Step>
+  
+  <Step title="Investigation">
+    1. Analyze email headers for origin
+    2. Analyze attachments in sandbox (use Cortex analyzers)
+    3. Check compromised URLs with URLscan.io
+    4. Review logs for credential use post-phishing
+    5. Check for data exfiltration or account compromise
+  </Step>
+  
+  <Step title="User Education">
+    1. Notify affected users of phishing attempt
+    2. Provide security awareness guidance
+    3. Report trends to security awareness team
+    4. Consider targeted training for repeat clickers
+  </Step>
+</Steps>
+
+### Data Breach Incident
+
+<Warning>
+Data breach incidents have significant legal and regulatory implications. Involve legal counsel early in the process.
+</Warning>
+
+<Steps>
+  <Step title="Immediate Containment">
+    1. Identify and stop ongoing exfiltration
+    2. Isolate compromised systems
+    3. Preserve evidence (memory dumps, disk images, logs)
+    4. Create TheHive case with "data-breach" tag
+    5. Notify management immediately
+  </Step>
+  
+  <Step title="Scope Assessment">
+    1. Identify what data was accessed/exfiltrated
+    2. Determine number of records affected
+    3. Classify data sensitivity (PII, PHI, financial, trade secrets)
+    4. Establish timeline of unauthorized access
+    5. Identify affected individuals/customers
+  </Step>
+  
+  <Step title="Legal and Regulatory">
+    1. Engage legal counsel
+    2. Assess regulatory notification requirements
+    3. Prepare notification templates (customers, regulators, media)
+    4. Activate cyber insurance if applicable
+    5. Consider law enforcement notification
+  </Step>
+  
+  <Step title="Notification and Remediation">
+    1. Notify affected individuals per legal requirements
+    2. Offer credit monitoring if appropriate
+    3. Implement additional security controls
+    4. Conduct security assessment of similar systems
+    5. Update incident response plan based on lessons learned
+  </Step>
+</Steps>
+
+## Post-Incident Review Process
+
+<Info>
+Post-incident reviews are learning opportunities, not blame sessions. Focus on process improvement, not individual mistakes.
+</Info>
+
+### Review Meeting Agenda
+
+<Steps>
+  <Step title="Incident Overview (10 minutes)">
+    - Present incident timeline
+    - Describe attack vector and techniques
+    - Summarize impact and scope
+    - Review response timeline
+  </Step>
+  
+  <Step title="What Went Well (15 minutes)">
+    - Effective detection mechanisms
+    - Successful containment actions
+    - Good communication and collaboration
+    - Useful tools and processes
+  </Step>
+  
+  <Step title="What Went Wrong (20 minutes)">
+    - Delayed detection or response
+    - Missing visibility or monitoring
+    - Tool or process failures
+    - Communication breakdowns
+    - Documentation gaps
+  </Step>
+  
+  <Step title="Action Items (15 minutes)">
+    - Detection improvements needed
+    - Additional monitoring or alerting
+    - Playbook updates
+    - Training requirements
+    - Technology investments
+    
+    Assign owners and due dates for each action item
+  </Step>
+</Steps>
+
+### Review Documentation
+
+Create a formal post-incident report including:
+
+1. **Executive Summary**: High-level overview for management
+2. **Detailed Timeline**: Complete event sequence
+3. **Technical Analysis**: Attack methods, tools, and IOCs
+4. **Impact Assessment**: Business impact, costs, data affected
+5. **Response Evaluation**: What worked and what didn't
+6. **Recommendations**: Specific improvements with priorities
+7. **Action Plan**: Assigned tasks with deadlines
+
+<Tip>
+Share sanitized incident reports with the broader security community to help others defend against similar attacks.
+</Tip>
+
+## Communication During Incidents
+
+### Internal Communications
+
+**SOC Team:**
+- Use dedicated Slack/Teams channel for real-time coordination
+- Update TheHive case frequently with progress
+- Hold standup calls every 2-4 hours for major incidents
+
+**Management:**
+- Provide initial notification within 30 minutes of critical incident
+- Send status updates every 2 hours or when major developments occur
+- Keep updates concise: status, impact, next steps, ETA
+
+**Affected Users:**
+- Notify of service disruptions promptly
+- Provide clear guidance on required actions
+- Set expectations for resolution timeframe
+
+### External Communications
+
+<Warning>
+All external communications during a security incident must be approved by management and legal counsel.
+</Warning>
+
+**Guidelines:**
+- Coordinate with PR/communications team
+- Stick to approved messaging
+- Never speculate or provide unconfirmed information
+- Refer media inquiries to designated spokesperson
+- Document all external communications
+
+## Metrics and Reporting
+
+Track key incident response metrics:
+
+- **Mean Time to Detect (MTTD)**: Time from incident occurrence to detection
+- **Mean Time to Respond (MTTR)**: Time from detection to containment
+- **Mean Time to Resolve (MTTR)**: Time from detection to full resolution
+- **Incident Count by Type**: Trends in incident categories
+- **Incident Count by Severity**: Distribution of severity levels
+- **False Positive Rate**: Alerts that were not incidents
+- **Escalation Rate**: Percentage requiring escalation
+
+<Note>
+Regular metric review helps identify areas for improvement in detection and response capabilities.
+</Note>
+
+## Related Resources
+
+- [Monitoring Guide](/operations/monitoring-guide) - Daily monitoring operations and alert management
+- [Threat Hunting](/operations/threat-hunting) - Proactive threat detection techniques
+- [Maintenance](/operations/maintenance) - System maintenance and tuning procedures

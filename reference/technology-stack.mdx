@@ -1,0 +1,187 @@
+---
+title: Technology Stack
+description: Complete overview of all technologies and components used in the Enterprise SOC Architecture
+---
+
+The Enterprise SOC Architecture leverages a comprehensive stack of open-source and industry-standard security technologies. Each component serves a specific purpose in the detection, analysis, and response pipeline.
+
+## Core Components
+
+<CardGroup cols={2}>
+  <Card title="Wazuh" icon="shield-halved" href="https://documentation.wazuh.com/">
+    **SIEM/XDR Platform**
+    
+    Unified security platform providing event visualization, correlation, custom dashboards, and EDR capabilities.
+    
+    Status: **Planned**
+  </Card>
+  
+  <Card title="Elasticsearch" icon="database" href="https://www.elastic.co/guide/">
+    **Data Storage & Search**
+    
+    High-performance search and analytics engine for centralized event storage and log analysis.
+    
+    Status: **Planned**
+  </Card>
+  
+  <Card title="TheHive" icon="ticket" href="https://thehive-project.org/">
+    **Incident Management**
+    
+    Security incident response platform for case management and collaborative investigation.
+    
+    Status: **Planned**
+  </Card>
+  
+  <Card title="Cortex" icon="gears" href="https://thehive-project.org/">
+    **SOAR Platform**
+    
+    Security Orchestration, Automation and Response for automated incident response workflows.
+    
+    Status: **Planned**
+  </Card>
+</CardGroup>
+
+## Detection Layer (IDS/IPS)
+
+<CardGroup cols={2}>
+  <Card title="Suricata" icon="radar" href="https://suricata.readthedocs.io/">
+    **High-Performance IDS/IPS**
+    
+    Advanced intrusion detection and prevention system with multi-threaded architecture and protocol detection.
+    
+    Status: **Planned**
+  </Card>
+  
+  <Card title="Snort" icon="eye" href="https://www.snort.org/documents">
+    **Rule-Based IDS**
+    
+    Industry-standard network intrusion detection system using signature-based detection rules.
+    
+    Status: **Planned**
+  </Card>
+</CardGroup>
+
+## Log Aggregation & Processing
+
+<CardGroup cols={2}>
+  <Card title="Logstash" icon="filter" href="https://www.elastic.co/guide/en/logstash/current/index.html">
+    **Data Processing Pipeline**
+    
+    Server-side data processing pipeline for ingesting, transforming, and forwarding log data.
+    
+    Status: **Planned**
+  </Card>
+  
+  <Card title="Fluentd" icon="stream" href="https://docs.fluentd.org/">
+    **Unified Logging Layer**
+    
+    Open-source data collector for unified logging layer, supporting multiple data sources and outputs.
+    
+    Status: **Planned**
+  </Card>
+</CardGroup>
+
+## Infrastructure Monitoring
+
+<CardGroup cols={2}>
+  <Card title="Prometheus" icon="chart-line" href="https://prometheus.io/docs/">
+    **Metrics & Alerting**
+    
+    Real-time metrics collection and alerting system with powerful query language (PromQL).
+    
+    Status: **Planned**
+  </Card>
+  
+  <Card title="Zabbix" icon="server" href="https://www.zabbix.com/documentation/">
+    **Infrastructure Monitoring**
+    
+    Enterprise-class monitoring solution for availability, performance, and health metrics.
+    
+    Status: **Planned**
+  </Card>
+</CardGroup>
+
+## Automation & Infrastructure as Code
+
+<CardGroup cols={2}>
+  <Card title="Terraform" icon="code" href="https://www.terraform.io/docs">
+    **Infrastructure Provisioning**
+    
+    Infrastructure as Code tool for building, changing, and versioning infrastructure safely.
+    
+    Status: **Planned**
+  </Card>
+  
+  <Card title="PyInfra" icon="python" href="https://docs.pyinfra.com/">
+    **Configuration Management**
+    
+    Python-based automation and configuration management for infrastructure deployment.
+    
+    Status: **Planned**
+  </Card>
+</CardGroup>
+
+## Long-Term Roadmap Components
+
+<Note type="info">
+  The following components are planned for **long-term implementation** and are not part of the initial core architecture.
+</Note>
+
+<CardGroup cols={2}>
+  <Card title="Honeypots-Proxmox" icon="honeycomb" href="https://www.proxmox.com/en/proxmox-ve">
+    **Deception Technology**
+    
+    Virtualized honeypot systems to attract, detect, and analyze attack patterns.
+    
+    Status: **Long-term**
+  </Card>
+  
+  <Card title="OPNsense" icon="firewall" href="https://docs.opnsense.org/">
+    **Perimeter Firewall**
+    
+    Open-source firewall and routing platform for network segmentation and traffic control.
+    
+    Status: **Long-term**
+  </Card>
+  
+  <Card title="Tailscale VPN" icon="network-wired" href="https://tailscale.com/kb/">
+    **Secure Remote Access**
+    
+    Mesh VPN solution built on WireGuard for secure remote access to SOC infrastructure.
+    
+    Status: **Long-term**
+  </Card>
+</CardGroup>
+
+## Technology Summary
+
+| Component | Purpose | Type | Status |
+|:---:|:---:|:---:|:---:|
+| Snort/Suricata | Intrusion Detection | IDS/IPS | Planned |
+| Logstash/Fluentd | Log Aggregation | Pipeline | Planned |
+| Elasticsearch | Event Storage | Database | Planned |
+| Wazuh | Security Platform | SIEM/XDR | Planned |
+| Zabbix | Infrastructure Monitoring | Monitoring | Planned |
+| Prometheus | Metrics & Alerts | Monitoring | Planned |
+| TheHive | Incident Management | Ticketing | Planned |
+| Cortex | Orchestration | SOAR | Planned |
+| Terraform/PyInfra | Automation | IaC | Planned |
+| Honeypots-Proxmox | Deception | Security | Long-term |
+| OPNsense | Perimeter Security | Network Security | Long-term |
+| Tailscale | Remote Access | VPN | Long-term |
+
+<Note type="warning">
+  **Current Status**: All components are in the conceptual design phase. No implementation has begun.
+</Note>
+
+## Official Documentation Links
+
+- [Wazuh Documentation](https://documentation.wazuh.com/)
+- [Elastic Stack Guide](https://www.elastic.co/guide/)
+- [TheHive Project](https://thehive-project.org/)
+- [Suricata User Guide](https://suricata.readthedocs.io/)
+- [Prometheus Documentation](https://prometheus.io/docs/)
+- [Zabbix Documentation](https://www.zabbix.com/documentation/)
+- [Terraform Documentation](https://www.terraform.io/docs)
+- [OPNsense Documentation](https://docs.opnsense.org/)
+- [Tailscale Knowledge Base](https://tailscale.com/kb/)

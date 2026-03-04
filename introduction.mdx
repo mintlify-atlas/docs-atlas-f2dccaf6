@@ -1,0 +1,120 @@
+---
+title: Introduction
+description: Welcome to the Enterprise SOC Architecture documentation - a comprehensive conceptual design for a modern Security Operations Center
+---
+
+# Introduction
+
+Welcome to the Enterprise SOC Architecture documentation. This project presents a comprehensive conceptual design for a Security Operations Center (SOC) that provides advanced capabilities for detection, monitoring, analysis, and incident response.
+
+<Warning>
+**Project Status**: This is a conceptual architecture in the design phase. Implementation has not yet begun and the architecture is subject to changes based on project needs.
+</Warning>
+
+## What is this Project?
+
+This Enterprise SOC Architecture is a complete conceptual design that defines a multi-layered security operations platform. The architecture integrates industry-leading open-source and commercial tools to create a unified security ecosystem capable of:
+
+- Detecting threats across network and endpoint layers
+- Aggregating and analyzing security events from multiple sources
+- Monitoring infrastructure health and performance
+- Responding to incidents with automated workflows
+- Providing comprehensive visibility into the security posture
+
+<Info>
+This is an educational and research-oriented architecture concept designed to demonstrate best practices in SOC design and implementation.
+</Info>
+
+## Purpose and Goals
+
+The primary objectives of this SOC architecture are:
+
+<CardGroup cols={2}>
+  <Card title="Proactive Threat Detection" icon="shield-halved">
+    Implement multiple layers of security to detect threats before they cause damage
+  </Card>
+  <Card title="Complete Visibility" icon="eye">
+    Gain comprehensive visibility into security events across the entire infrastructure
+  </Card>
+  <Card title="Rapid Incident Response" icon="bolt">
+    Enable fast response to security incidents through automation and orchestration
+  </Card>
+  <Card title="Forensic Analysis" icon="magnifying-glass">
+    Support detailed forensic investigation with centralized log storage and analysis
+  </Card>
+</CardGroup>
+
+### Core Capabilities
+
+<Steps>
+  <Step title="Detection">
+    Network-based intrusion detection using Snort and Suricata to monitor traffic from endpoints
+  </Step>
+  <Step title="Aggregation">
+    Log collection and processing through Logstash/Fluentd pipelines feeding into Elasticsearch
+  </Step>
+  <Step title="Analysis">
+    Event correlation and visualization through the Wazuh unified security platform
+  </Step>
+  <Step title="Response">
+    Incident management via TheHive with automated response orchestration through Cortex
+  </Step>
+</Steps>
+
+## Architecture Philosophy
+
+This SOC design embodies several key principles:
+
+- **Defense in Depth**: Multiple security layers that provide redundant protection
+- **Scalability**: Modular architecture that can grow with organizational needs
+- **Automation**: Reduce manual effort through orchestration and automated response
+- **Open Standards**: Leverage open-source technologies for flexibility and cost-effectiveness
+- **Integration**: Seamless data flow between components for holistic security visibility
+
+<Note>
+The architecture is designed to be scalable and modular, allowing for gradual growth and adaptation to specific environmental requirements.
+</Note>
+
+## Key Documentation Sections
+
+Explore the following sections to understand the complete architecture:
+
+<CardGroup cols={2}>
+  <Card title="Architecture Overview" icon="sitemap" href="/architecture-overview">
+    Explore the complete SOC architecture diagram and component layers
+  </Card>
+  <Card title="Design Principles" icon="compass-drafting" href="/design-principles">
+    Understand the architectural philosophy and technology selection
+  </Card>
+  <Card title="Components" icon="cubes" href="/components/detection-layer">
+    Deep dive into each component of the SOC stack
+  </Card>
+  <Card title="Deployment" icon="server" href="/deployment/prerequisites">
+    Learn about deployment strategies and infrastructure requirements
+  </Card>
+</CardGroup>
+
+## Long-Term Vision
+
+The architecture includes components planned for long-term implementation:
+
+<Accordion title="Future Enhancements">
+  - **Honeypots-Proxmox**: Virtualized deception technology to attract and analyze attacks
+  - **OPNsense Firewall**: Open-source perimeter firewall for traffic control and segmentation
+  - **Tailscale VPN**: Mesh VPN solution for secure remote access
+  
+  These components, highlighted in yellow in the architecture diagram, represent advanced capabilities that will be evaluated for future implementation.
+</Accordion>
+
+## Getting Started
+
+To understand this SOC architecture:
+
+1. Review the [Architecture Overview](/architecture-overview) to understand the component layers and data flows
+2. Study the [Design Principles](/design-principles) to grasp the architectural philosophy
+3. Explore individual component documentation to understand specific technologies
+4. Review deployment guides when ready to implement
+
+<Tip>
+This documentation is structured to be read sequentially for newcomers, but experienced SOC architects can jump directly to specific component sections.
+</Tip>

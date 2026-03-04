@@ -1,0 +1,398 @@
+---
+title: System Integrations
+description: Detailed integration points, APIs, protocols, and data formats used between SOC components
+---
+
+The Enterprise SOC Architecture relies on seamless integrations between multiple security and monitoring platforms. This page documents the integration mechanisms, protocols, and data formats used throughout the system.
+
+## Integration Architecture
+
+<Note type="info">
+  All integrations are designed to be **loosely coupled** and **protocol-based** to ensure scalability and maintainability.
+</Note>
+
+## Core Integration Points
+
+<Accordion title="Snort/Suricata → Logstash Integration">
+  ### IDS to Log Pipeline
+  
+  **Purpose**: Stream IDS alerts and network events to the central log processing pipeline
+  
+  **Protocol**: Syslog, File-based, EVE JSON
+  
+  **Data Format**:
+  - **Suricata**: EVE JSON (Extensible Event Format)
+  - **Snort**: Unified2 binary format or syslog
+  
+  **Configuration**:
+  ```yaml
+  # Suricata EVE JSON output
+  - eve-log:
+      enabled: yes
+      filetype: regular
+      filename: eve.json
+      types:
+        - alert
+        - http
+        - dns
+        - tls
+  ```
+  
+  **Logstash Input**:
+  ```ruby
+  input {
+    file {
+      path => "/var/log/suricata/eve.json"
+      codec => json
+      type => "suricata"
+    }
+  }
+  ```
+  
+  **Key Fields**: timestamp, src_ip, dest_ip, alert_signature, severity, protocol
+</Accordion>
+
+<Accordion title="Logstash/Fluentd → Elasticsearch Integration">
+  ### Log Pipeline to Storage
+  
+  **Purpose**: Store processed and normalized events in searchable index
+  
+  **Protocol**: HTTP/HTTPS (Elasticsearch REST API)
+  
+  **API Endpoint**: `POST /_bulk` (bulk indexing)
+  
+  **Data Format**: JSON documents with normalized schema
+  
+  **Index Strategy**:
+  - Time-based indices: `soc-events-YYYY.MM.DD`
+  - Index templates for consistent field mapping
+  - Lifecycle policies for data retention
+  
+  **Authentication**: API key or username/password
+  
+  **Sample Document**:
+  ```json
+  {
+    "@timestamp": "2026-03-04T10:30:00.000Z",
+    "event_type": "alert",
+    "source_ip": "192.168.1.100",
+    "destination_ip": "203.0.113.50",
+    "severity": "high",
+    "signature": "ET MALWARE Trojan Download",
+    "protocol": "tcp",
+    "source_system": "suricata"
+  }
+  ```
+</Accordion>
+
+<Accordion title="Elasticsearch → Wazuh Integration">
+  ### Storage to SIEM Platform
+  
+  **Purpose**: Query and analyze stored security events
+  
+  **Protocol**: Elasticsearch Query DSL (REST API)
+  
+  **Integration Method**: 
+  - Wazuh indexer (Elasticsearch fork) or
+  - Direct Elasticsearch backend
+  
+  **Query Operations**:
+  - Real-time event streaming
+  - Historical event search
+  - Aggregation and statistics
+  - Correlation queries
+  
+  **Wazuh Configuration**:
+  ```xml
+  <indexer>
+    <host>https://elasticsearch:9200</host>
+    <user>wazuh</user>
+    <password>password</password>
+  </indexer>
+  ```
+</Accordion>
+
+<Accordion title="Prometheus → Wazuh Integration">
+  ### Metrics to Security Platform
+  
+  **Purpose**: Correlate infrastructure metrics with security events
+  
+  **Protocol**: Prometheus Remote Read API or Webhook
+  
+  **Integration Approach**:
+  - Prometheus Alertmanager webhooks to Wazuh
+  - Custom exporters for Wazuh metrics
+  - Grafana as unified visualization layer
+  
+  **Alert Format**:
+  ```json
+  {
+    "status": "firing",
+    "alerts": [{
+      "labels": {
+        "alertname": "HighCPUUsage",
+        "severity": "warning",
+        "instance": "server-01"
+      },
+      "annotations": {
+        "summary": "CPU usage above 90%"
+      }
+    }]
+  }
+  ```
+</Accordion>
+
+<Accordion title="Zabbix → Prometheus Integration">
+  ### Infrastructure Monitoring to Metrics Platform
+  
+  **Purpose**: Export Zabbix metrics to Prometheus for unified monitoring
+  
+  **Protocol**: Prometheus exporter (pull-based)
+  
+  **Integration**: Zabbix Prometheus Exporter
+  
+  **Exported Metrics**:
+  - Host availability
+  - Item values
+  - Trigger states
+  - Problem counts
+  
+  **Prometheus Scrape Config**:
+  ```yaml
+  scrape_configs:
+    - job_name: 'zabbix'
+      static_configs:
+        - targets: ['zabbix-exporter:9091']
+  ```
+</Accordion>
+
+<Accordion title="Wazuh → TheHive Integration">
+  ### SIEM to Incident Management
+  
+  **Purpose**: Automatically create incident cases from security alerts
+  
+  **Protocol**: TheHive REST API (HTTP/HTTPS)
+  
+  **API Endpoint**: `POST /api/alert` or `POST /api/case`
+  
+  **Trigger**: Wazuh integration module or custom webhook
+  
+  **Wazuh Integration Config**:
+  ```xml
+  <integration>
+    <name>thehive</name>
+    <hook_url>https://thehive:9000/api/alert</hook_url>
+    <api_key>YOUR_API_KEY</api_key>
+    <alert_format>json</alert_format>
+    <level>7</level>
+  </integration>
+  ```
+  
+  **Alert Payload**:
+  ```json
+  {
+    "title": "Wazuh Alert: Malware Detected",
+    "description": "Suspicious file detected on endpoint",
+    "severity": 3,
+    "tags": ["malware", "endpoint", "wazuh"],
+    "source": "wazuh",
+    "sourceRef": "alert-12345",
+    "artifacts": [
+      {"dataType": "ip", "data": "192.168.1.100"},
+      {"dataType": "hash", "data": "abc123..."}
+    ]
+  }
+  ```
+</Accordion>
+
+<Accordion title="TheHive → Cortex Integration">
+  ### Incident Management to SOAR
+  
+  **Purpose**: Automate incident analysis and response actions
+  
+  **Protocol**: Cortex REST API
+  
+  **API Endpoints**:
+  - `POST /api/analyzer/{analyzerId}/run` - Run analysis
+  - `POST /api/responder/{responderId}/run` - Execute response
+  
+  **Integration Type**: Built-in TheHive-Cortex connector
+  
+  **Analyzers**: Investigate observables (IPs, domains, hashes)
+  - VirusTotal lookup
+  - MaxMind GeoIP
+  - MISP threat intelligence
+  - Custom analyzers
+  
+  **Responders**: Execute response actions
+  - Block IP at firewall
+  - Isolate endpoint
+  - Send notifications
+  - Update threat feeds
+  
+  **Configuration**:
+  ```conf
+  play.modules.enabled += org.thp.thehive.connector.cortex.CortexModule
+  
+  cortex {
+    servers = [
+      {
+        name = "Cortex-01"
+        url = "http://cortex:9001"
+        auth {
+          type = "bearer"
+          key = "API_KEY"
+        }
+      }
+    ]
+  }
+  ```
+</Accordion>
+
+<Accordion title="Wazuh Agents → Wazuh Manager Integration">
+  ### Endpoint to Central Manager
+  
+  **Purpose**: Collect endpoint security events and system logs
+  
+  **Protocol**: Wazuh Agent Protocol (TCP/UDP port 1514, 1515)
+  
+  **Communication**:
+  - Agent registration and authentication
+  - Real-time event forwarding
+  - Command execution (for active response)
+  - File integrity monitoring
+  
+  **Agent Configuration**:
+  ```xml
+  <client>
+    <server>
+      <address>wazuh-manager.local</address>
+      <port>1514</port>
+      <protocol>tcp</protocol>
+    </server>
+  </client>
+  ```
+  
+  **Collected Data**:
+  - System logs
+  - Security events
+  - File integrity changes
+  - Process information
+  - Network connections
+</Accordion>
+
+## Future Integration Points
+
+<Note type="warning">
+  The following integrations are planned for **long-term implementation**.
+</Note>
+
+<Accordion title="Honeypots → Wazuh Integration (Long-term)">
+  ### Deception Technology to SIEM
+  
+  **Purpose**: Feed honeypot interaction data into security analysis
+  
+  **Protocol**: Syslog, JSON over HTTP
+  
+  **Data Types**:
+  - SSH login attempts
+  - HTTP request logs
+  - Malware samples
+  - Attack signatures
+  
+  **Integration Approach**:
+  - Honeypot logs → Logstash → Elasticsearch → Wazuh
+  - Direct Wazuh agent on honeypot VM
+</Accordion>
+
+<Accordion title="OPNsense → SIEM Integration (Long-term)">
+  ### Firewall to Security Platform
+  
+  **Purpose**: Centralize firewall logs and alerts
+  
+  **Protocol**: Syslog, Netflow
+  
+  **Log Types**:
+  - Connection logs
+  - Blocked traffic
+  - IPS alerts (Suricata on OPNsense)
+  - VPN connections
+  
+  **OPNsense Configuration**: Enable remote syslog to Logstash endpoint
+</Accordion>
+
+<Accordion title="Tailscale → Logging Integration (Long-term)">
+  ### VPN Access to Security Monitoring
+  
+  **Purpose**: Monitor and audit VPN access patterns
+  
+  **Protocol**: Tailscale API, Webhook
+  
+  **Logged Events**:
+  - User authentication
+  - Device connections
+  - Access policy changes
+  - Network activity
+  
+  **Integration**: Tailscale audit logs → Logstash → Wazuh
+</Accordion>
+
+## Data Format Standards
+
+### Normalized Event Schema
+
+All events are normalized to a common schema for correlation:
+
+```json
+{
+  "@timestamp": "ISO8601 timestamp",
+  "event_type": "alert|log|metric",
+  "severity": "critical|high|medium|low|info",
+  "source_system": "component name",
+  "source_ip": "IP address",
+  "destination_ip": "IP address",
+  "user": "username",
+  "action": "blocked|allowed|detected",
+  "message": "human-readable description",
+  "tags": ["array", "of", "tags"],
+  "metadata": {"additional": "context"}
+}
+```
+
+## Authentication & Security
+
+<CardGroup cols={2}>
+  <Card title="API Authentication" icon="key">
+    - **API Keys**: TheHive, Cortex, Elasticsearch
+    - **Bearer Tokens**: Wazuh API
+    - **Client Certificates**: Wazuh Agents
+    - **Username/Password**: Zabbix, Grafana
+  </Card>
+  
+  <Card title="Transport Security" icon="lock">
+    - **TLS/SSL**: All HTTP-based integrations
+    - **Encrypted Channels**: Wazuh agent communication
+    - **VPN Tunnels**: Inter-site communication
+    - **Network Segmentation**: Isolate SOC components
+  </Card>
+</CardGroup>
+
+## Integration Testing
+
+<Note type="tip">
+  **Recommended Testing Approach**:
+  1. Unit test each integration endpoint
+  2. Validate data format transformations
+  3. Test authentication mechanisms
+  4. Verify end-to-end data flow
+  5. Load test with realistic event volumes
+</Note>
+
+## Troubleshooting Common Integration Issues
+
+| Issue | Component | Solution |
+|-------|-----------|----------|
+| Events not appearing | Logstash → Elasticsearch | Check index patterns, verify bulk API |
+| Alerts not triggering | Wazuh → TheHive | Validate API key, check alert level threshold |
+| Missing metrics | Prometheus scrape | Verify network connectivity, check exporter status |
+| Agent disconnected | Wazuh Agent → Manager | Check port 1514/1515, verify certificates |

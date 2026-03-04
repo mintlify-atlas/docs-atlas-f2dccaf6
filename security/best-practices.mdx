@@ -1,0 +1,364 @@
+---
+title: 'Security Best Practices'
+description: 'Comprehensive security hardening and operational best practices for SOC infrastructure'
+---
+
+## Overview
+
+Implementing security best practices across all SOC components is essential to ensure the integrity, availability, and confidentiality of the security monitoring infrastructure itself. This page outlines comprehensive hardening measures and operational practices for the Enterprise SOC Architecture.
+
+<Warning>
+  A compromised SOC infrastructure can blind your security operations and provide attackers with detailed knowledge of your defenses. Securing the SOC is critical.
+</Warning>
+
+## Defense in Depth Strategy
+
+The SOC architecture implements multiple layers of security controls to provide comprehensive protection:
+
+<CardGroup cols={2}>
+  <Card title="Network Segmentation" icon="layer-group">
+    Isolate SOC components in dedicated network segments with strict firewall rules and access controls
+  </Card>
+  
+  <Card title="Principle of Least Privilege" icon="key">
+    Grant minimum necessary permissions to users, services, and systems
+  </Card>
+  
+  <Card title="Defense in Depth" icon="shield">
+    Multiple overlapping security controls so failure of one doesn't compromise entire system
+  </Card>
+  
+  <Card title="Secure by Default" icon="lock">
+    All components configured with security-first settings out of the box
+  </Card>
+</CardGroup>
+
+## Component Hardening
+
+<Accordion title="IDS/IPS Security (Snort & Suricata)">
+  ### System Hardening
+  - Run IDS/IPS processes with minimal privileges (non-root when possible)
+  - Deploy on hardened operating systems with minimal installed packages
+  - Disable unnecessary services and ports
+  - Enable SELinux or AppArmor for mandatory access control
+  
+  ### Network Security
+  - Deploy in tap/span mode to prevent bypass attacks
+  - Use dedicated management interfaces separate from monitoring interfaces
+  - Implement network segmentation to isolate IDS from production networks
+  - Encrypt all management traffic with TLS/SSH
+  
+  ### Configuration Security
+  - Store rule sets in version control with change tracking
+  - Implement rule testing pipeline before production deployment
+  - Regularly update detection signatures from trusted sources
+  - Protect configuration files with appropriate file permissions (600/640)
+  
+  <Tip>
+    Use IDS in passive monitoring mode (tap/span) to prevent attackers from bypassing detection by exploiting IPS vulnerabilities.
+  </Tip>
+</Accordion>
+
+<Accordion title="SIEM/XDR Platform (Wazuh)">
+  ### Access Control
+  - Implement role-based access control (RBAC) with granular permissions
+  - Enable multi-factor authentication (MFA) for all user accounts
+  - Use separate service accounts with minimal privileges
+  - Regular audit of user permissions and access logs
+  
+  ### Data Protection
+  - Encrypt data at rest using full disk encryption or database encryption
+  - Encrypt data in transit with TLS 1.3 or higher
+  - Implement log integrity verification with checksums/signatures
+  - Regular backups stored securely with encryption
+  
+  ### Agent Security
+  - Deploy agents with restricted privileges
+  - Authenticate agents using certificates or pre-shared keys
+  - Encrypt agent-to-manager communications
+  - Implement agent version control and update management
+  
+  ### API Security
+  - Use API keys with appropriate scopes and expiration
+  - Implement rate limiting to prevent abuse
+  - Enable API audit logging
+  - Validate and sanitize all API inputs
+  
+  <Note>
+    Wazuh manager should be deployed in a dedicated, isolated network segment with strict firewall rules allowing only necessary agent and API traffic.
+  </Note>
+</Accordion>
+
+<Accordion title="Log Pipeline (Logstash/Fluentd)">
+  ### Input Security
+  - Validate and sanitize all log inputs to prevent injection attacks
+  - Use authenticated inputs where possible (syslog-TLS, Beats with TLS)
+  - Implement input rate limiting to prevent resource exhaustion
+  - Filter malicious content before processing
+  
+  ### Processing Security
+  - Run with minimal system privileges
+  - Sanitize data before output to prevent injection into downstream systems
+  - Implement resource limits (memory, CPU) to prevent DoS
+  - Use secure parsing libraries and keep them updated
+  
+  ### Output Security
+  - Encrypt outputs to Elasticsearch and other destinations
+  - Authenticate to downstream systems with service accounts
+  - Implement output validation and error handling
+  - Monitor for output failures and data loss
+  
+  <Warning>
+    Log injection attacks can compromise downstream systems. Always validate and sanitize log inputs before processing.
+  </Warning>
+</Accordion>
+
+<Accordion title="Data Store (Elasticsearch)">
+  ### Authentication & Authorization
+  - Enable security features (X-Pack Security or equivalent)
+  - Implement role-based access control for indices
+  - Use separate users for different applications with minimal privileges
+  - Enable audit logging for all access and changes
+  
+  ### Network Security
+  - Bind to private network interfaces only
+  - Enable TLS for all HTTP and transport communications
+  - Use firewall rules to restrict access to trusted hosts
+  - Disable unnecessary HTTP features and plugins
+  
+  ### Data Security
+  - Enable encryption at rest for indices
+  - Implement index lifecycle management with secure deletion
+  - Regular snapshots stored in encrypted format
+  - Protect sensitive fields with field-level security
+  
+  ### Cluster Security
+  - Use strong inter-node authentication
+  - Encrypt inter-node communications
+  - Implement cluster-level security policies
+  - Regular security updates and patches
+  
+  <Info>
+    Consider implementing index-level encryption and access controls for sensitive security data to ensure compliance with data protection requirements.
+  </Info>
+</Accordion>
+
+<Accordion title="Monitoring Systems (Zabbix & Prometheus)">
+  ### Access Security
+  - Strong authentication for web interfaces
+  - Role-based access control for users
+  - MFA for administrative accounts
+  - Regular review of user access
+  
+  ### Agent/Exporter Security
+  - Use encrypted agent communications where possible
+  - Implement agent authentication
+  - Run agents with minimal privileges
+  - Regular agent updates and patching
+  
+  ### API Security
+  - Secure API endpoints with authentication
+  - Implement API rate limiting
+  - Use TLS for API communications
+  - Audit API access and usage
+  
+  ### Data Protection
+  - Protect credentials stored in monitoring configurations
+  - Encrypt sensitive metric data
+  - Implement access controls for sensitive metrics
+  - Secure backup of configurations and historical data
+</Accordion>
+
+<Accordion title="Incident Response (TheHive & Cortex)">
+  ### Platform Security
+  - Strong authentication with MFA
+  - Role-based access control for cases and investigations
+  - Secure API access with authentication tokens
+  - Audit logging of all case activities
+  
+  ### Data Classification
+  - Classify cases by sensitivity level
+  - Implement data retention policies
+  - Secure deletion of closed cases
+  - Encryption of sensitive case data
+  
+  ### Integration Security
+  - Secure API keys and credentials for integrations
+  - Use encrypted communications for all integrations
+  - Validate inputs from external systems
+  - Monitor integration health and security
+  
+  ### Automation Security (Cortex)
+  - Review and approve all analyzers and responders
+  - Run automations with minimal privileges
+  - Implement approval workflows for sensitive actions
+  - Audit all automated actions
+  
+  <Warning>
+    TheHive contains sensitive incident data. Implement strict access controls and encryption to protect investigation details from unauthorized access.
+  </Warning>
+</Accordion>
+
+## Access Control & Authentication
+
+### Identity and Access Management
+
+<CardGroup cols={2}>
+  <Card title="Centralized Authentication" icon="users">
+    Integrate all SOC components with centralized identity provider (LDAP, Active Directory, SAML, OAuth)
+  </Card>
+  
+  <Card title="Multi-Factor Authentication" icon="mobile">
+    Require MFA for all human access to SOC infrastructure, especially privileged accounts
+  </Card>
+  
+  <Card title="Privileged Access Management" icon="crown">
+    Implement PAM solution for administrative access with session recording and monitoring
+  </Card>
+  
+  <Card title="Regular Access Reviews" icon="clipboard-check">
+    Quarterly review of all user access rights and service account permissions
+  </Card>
+</CardGroup>
+
+### Best Practices
+
+<Info>
+  Use service accounts for all system-to-system integrations, never share human user credentials between systems.
+</Info>
+
+- **Password Policy**: Enforce strong passwords (minimum 16 characters, complexity requirements)
+- **Session Management**: Implement session timeouts (15-30 minutes of inactivity)
+- **Account Lockout**: Lock accounts after 5 failed login attempts
+- **Credential Rotation**: Rotate service account credentials every 90 days
+- **Emergency Access**: Maintain break-glass accounts with offline credentials
+
+## Secure Communications
+
+All communications between SOC components must be encrypted and authenticated:
+
+### Encryption Standards
+
+| Communication Type | Protocol | Key Length | Notes |
+|--------------------|----------|------------|-------|
+| Web Interfaces | HTTPS/TLS 1.3 | 2048-bit RSA or 256-bit ECC | Disable older TLS versions |
+| API Communications | HTTPS/TLS 1.3 | 2048-bit RSA or 256-bit ECC | Use mutual TLS where possible |
+| Agent Communications | TLS 1.2+ | 2048-bit RSA minimum | Certificate-based authentication |
+| Database Connections | TLS 1.2+ | 2048-bit RSA minimum | Validate certificates |
+| Syslog | TLS (RFC 5425) | 2048-bit RSA minimum | Prefer syslog-TLS over UDP |
+
+### Certificate Management
+
+<Tip>
+  Use a private PKI infrastructure for internal SOC component certificates to maintain control over certificate lifecycle.
+</Tip>
+
+- **Certificate Authority**: Use internal CA for component certificates
+- **Certificate Lifecycle**: Automate certificate renewal (e.g., 90-day validity)
+- **Revocation**: Implement certificate revocation checking (CRL/OCSP)
+- **Storage**: Protect private keys with appropriate file permissions and hardware security modules (HSM) for critical systems
+
+### Network Segmentation
+
+```
+┌─────────────────────────────────────────────────┐
+│ DMZ (Monitoring Zone)                           │
+│ - IDS/IPS sensors                               │
+│ - Log collectors                                │
+└─────────────────────────────────────────────────┘
+               │ Firewall
+┌─────────────────────────────────────────────────┐
+│ SOC Core Zone                                   │
+│ - Wazuh, Elasticsearch, TheHive                 │
+│ - Strict firewall rules                         │
+└─────────────────────────────────────────────────┘
+               │ Firewall
+┌─────────────────────────────────────────────────┐
+│ Management Zone                                 │
+│ - Administrative access                         │
+│ - Jump hosts/Bastion                            │
+└─────────────────────────────────────────────────┘
+```
+
+## Operational Security
+
+### Change Management
+
+<Accordion title="Configuration Change Control">
+  - All configuration changes must be reviewed and approved
+  - Use version control (Git) for all configurations
+  - Test changes in non-production environment first
+  - Document changes with business justification
+  - Implement rollback procedures for all changes
+</Accordion>
+
+<Accordion title="Patch Management">
+  - Regular vulnerability scanning of all SOC components
+  - Prioritize security patches (deploy critical patches within 7 days)
+  - Test patches in non-production environment
+  - Maintain patch compliance metrics
+  - Document patching schedule and exceptions
+</Accordion>
+
+<Accordion title="Backup and Recovery">
+  - Daily backups of all critical SOC data and configurations
+  - Encrypt backups at rest and in transit
+  - Store backups in separate location/network
+  - Regular backup restoration testing (monthly)
+  - Document recovery time objectives (RTO) and recovery point objectives (RPO)
+  
+  <Note>
+    Test backup restoration procedures regularly. Untested backups are worthless in a real disaster scenario.
+  </Note>
+</Accordion>
+
+<Accordion title="Monitoring the Monitors">
+  - Implement health monitoring for all SOC components
+  - Alert on component failures or performance degradation
+  - Monitor for signs of compromise (unexpected config changes, unusual access patterns)
+  - Regular security audits of SOC infrastructure
+  - Track SOC performance metrics and SLAs
+</Accordion>
+
+### Incident Response for SOC Infrastructure
+
+<Warning>
+  Have a documented incident response plan specifically for compromise of the SOC infrastructure itself.
+</Warning>
+
+1. **Detection**: Monitor SOC components for signs of compromise
+2. **Isolation**: Ability to quickly isolate compromised components
+3. **Investigation**: Forensic capabilities for SOC infrastructure
+4. **Recovery**: Documented recovery procedures and clean backup images
+5. **Lessons Learned**: Post-incident review and improvement process
+
+## Security Baselines
+
+Maintain security baselines for all SOC components:
+
+- **Operating System Hardening**: CIS benchmarks or equivalent
+- **Application Hardening**: Vendor security best practices
+- **Network Configuration**: Firewall rules and network policies
+- **Access Controls**: User and service account permissions
+- **Monitoring Rules**: Detection rules and alert thresholds
+
+<Info>
+  Document deviations from security baselines with business justification and compensating controls.
+</Info>
+
+## Continuous Security Assessment
+
+### Regular Security Activities
+
+| Activity | Frequency | Responsibility |
+|----------|-----------|----------------|
+| Vulnerability Scanning | Weekly | Security Team |
+| Security Patch Review | Weekly | Operations Team |
+| Access Rights Review | Quarterly | Security & IT Managers |
+| Penetration Testing | Annually | External Auditors |
+| Configuration Audit | Quarterly | Security Team |
+| Disaster Recovery Test | Semi-annually | Operations Team |
+
+<Tip>
+  Implement continuous monitoring and alerting for configuration drift from security baselines to identify unauthorized changes quickly.
+</Tip>

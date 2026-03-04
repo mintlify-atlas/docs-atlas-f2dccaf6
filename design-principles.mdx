@@ -1,0 +1,342 @@
+---
+title: Design Principles
+description: Core design principles, architectural philosophy, and technology selection rationale for the Enterprise SOC Architecture
+---
+
+# Design Principles
+
+The Enterprise SOC Architecture is built on a foundation of proven security and architectural principles. This page documents the core design philosophy, technology selection rationale, and best practices that guide the architecture.
+
+## Core Design Principles
+
+The following principles shape every architectural decision in this SOC design:
+
+### Defense in Depth
+
+<Card title="Layered Security Approach" icon="layer-group">
+  The architecture implements multiple overlapping security layers to ensure that if one control fails, others continue to provide protection.
+</Card>
+
+**Implementation in the Architecture**:
+
+<Steps>
+  <Step title="Network Layer">
+    IDS/IPS systems (Snort, Suricata) provide the first line of detection at the network perimeter, analyzing traffic patterns and signatures.
+  </Step>
+  
+  <Step title="Endpoint Layer">
+    Wazuh agents provide endpoint detection and response (EDR) capabilities, monitoring host-based activities and file integrity.
+  </Step>
+  
+  <Step title="Application Layer">
+    Log aggregation captures application-level events, enabling detection of attacks that bypass network controls.
+  </Step>
+  
+  <Step title="Infrastructure Layer">
+    Monitoring tools (Zabbix, Prometheus) detect anomalies in system behavior that may indicate compromise.
+  </Step>
+</Steps>
+
+<Info>
+Defense in depth ensures that no single point of failure can compromise the entire security posture. Each layer provides independent detection and protection capabilities.
+</Info>
+
+### Scalability and Performance
+
+The architecture must handle growing data volumes and infrastructure expansion without degradation:
+
+<CardGroup cols={2}>
+  <Card title="Horizontal Scalability" icon="arrows-left-right">
+    Components like Elasticsearch, Logstash, and IDS sensors can be deployed in distributed configurations to handle increased load
+  </Card>
+  
+  <Card title="Vertical Scalability" icon="arrows-up-down">
+    Critical components can scale resources (CPU, memory, storage) to meet performance requirements
+  </Card>
+  
+  <Card title="Elastic Capacity" icon="gauge-high">
+    Cloud-native components support dynamic resource allocation based on workload
+  </Card>
+  
+  <Card title="Performance Optimization" icon="rocket">
+    High-performance tools like Suricata and Prometheus are selected for efficiency
+  </Card>
+</CardGroup>
+
+<Tip>
+The modular design allows you to scale individual components independently based on specific bottlenecks, rather than scaling the entire stack.
+</Tip>
+
+### Modularity and Flexibility
+
+Each component is designed to operate independently while integrating seamlessly:
+
+<Accordion title="Component Independence">
+  Individual components can be deployed, upgraded, or replaced without affecting the entire system. For example:
+  - IDS systems operate independently and feed data to the aggregation layer
+  - Elasticsearch can be replaced with alternative storage backends
+  - Monitoring tools provide value even without SIEM integration
+</Accordion>
+
+<Accordion title="Phased Implementation">
+  The architecture supports gradual rollout:
+  1. Start with core detection and logging (IDS + Logstash + Elasticsearch)
+  2. Add unified security platform (Wazuh)
+  3. Implement incident management (TheHive)
+  4. Enable orchestration and automation (Cortex, Terraform/PyInfra)
+  5. Deploy advanced capabilities (Honeypots, VPN, advanced firewall)
+</Accordion>
+
+<Accordion title="Technology Agnostic Integration">
+  Standard protocols and APIs ensure components can be swapped:
+  - Syslog for log transmission
+  - REST APIs for orchestration
+  - Standard alert formats for incident management
+</Accordion>
+
+### Automation and Orchestration
+
+Manual security operations don't scale. The architecture emphasizes automation at every layer:
+
+**Automated Response Capabilities**:
+
+- **Event Correlation**: Wazuh automatically correlates events to detect complex attack patterns
+- **Incident Creation**: Security events automatically generate tickets in TheHive
+- **Response Playbooks**: Cortex executes automated response actions based on incident type
+- **Infrastructure Management**: Terraform/PyInfra automate deployment and configuration
+
+<Warning>
+While automation improves efficiency, critical response actions should include human approval gates to prevent unintended consequences.
+</Warning>
+
+**Benefits of Automation**:
+
+<CardGroup cols={2}>
+  <Card title="Reduced MTTR" icon="clock">
+    Mean Time To Response decreases dramatically with automated playbooks
+  </Card>
+  
+  <Card title="Consistency" icon="check-double">
+    Automated responses are consistent and repeatable, eliminating human error
+  </Card>
+  
+  <Card title="24/7 Operations" icon="moon">
+    Automation provides continuous response capability even outside business hours
+  </Card>
+  
+  <Card title="Analyst Efficiency" icon="user-check">
+    Automation handles repetitive tasks, allowing analysts to focus on complex investigations
+  </Card>
+</CardGroup>
+
+## Technology Selection Rationale
+
+Every technology in the architecture was selected based on specific criteria:
+
+### Selection Criteria
+
+<Steps>
+  <Step title="Open Source Priority">
+    Preference for open-source solutions to avoid vendor lock-in, enable customization, and reduce licensing costs
+  </Step>
+  
+  <Step title="Community Support">
+    Active community and commercial support availability for critical components
+  </Step>
+  
+  <Step title="Scalability">
+    Proven ability to scale to enterprise workloads
+  </Step>
+  
+  <Step title="Integration Capabilities">
+    Standard APIs and protocols for seamless integration
+  </Step>
+  
+  <Step title="Performance">
+    Efficient resource utilization and high throughput
+  </Step>
+</Steps>
+
+### Component Justification
+
+<Accordion title="Why Snort and Suricata?">
+  **Dual IDS Approach**: Using both provides:
+  - **Snort**: Mature rule set, lightweight footprint, proven detection capabilities
+  - **Suricata**: Multi-threading, advanced features like file extraction, modern architecture
+  
+  Running both ensures maximum detection coverage with different detection engines and rule sets.
+</Accordion>
+
+<Accordion title="Why Elastic Stack?">
+  **Elasticsearch + Logstash** provide:
+  - Industry-standard log aggregation and storage
+  - Powerful search and analytics capabilities
+  - Horizontal scalability for petabyte-scale data
+  - Rich ecosystem of integrations and plugins
+  - Alternative to FluentD offers flexibility in pipeline design
+</Accordion>
+
+<Accordion title="Why Wazuh as the Central Platform?">
+  **Wazuh** was selected as the unified security platform because:
+  - Open-source SIEM/XDR with no licensing costs
+  - Built-in EDR capabilities for endpoint visibility
+  - Extensive compliance frameworks (PCI-DSS, HIPAA, GDPR)
+  - Integration with Elastic Stack for storage and visualization
+  - Active development and strong community support
+  - File integrity monitoring, vulnerability detection, and configuration assessment
+</Accordion>
+
+<Accordion title="Why Zabbix and Prometheus?">
+  **Dual Monitoring Strategy**:
+  - **Zabbix**: Traditional infrastructure monitoring with agent-based collection, ideal for availability and resource monitoring
+  - **Prometheus**: Modern metrics collection with pull-based architecture, excellent for application metrics and cloud-native environments
+  
+  Together they provide comprehensive infrastructure visibility with redundancy.
+</Accordion>
+
+<Accordion title="Why TheHive and Cortex?">
+  **Integrated Incident Response**:
+  - **TheHive**: Open-source incident response platform designed for SOC workflows
+  - **Cortex**: Purpose-built for automation and orchestration with TheHive
+  - Native integration between the two platforms
+  - Extensible through custom analyzers and responders
+  - Case management with collaboration features
+</Accordion>
+
+<Accordion title="Why Terraform and PyInfra?">
+  **Infrastructure as Code**:
+  - **Terraform**: Industry-standard IaC for provisioning infrastructure across multiple providers
+  - **PyInfra**: Python-based automation for configuration management and deployment
+  - Both enable version-controlled, auditable infrastructure changes
+  - Automation reduces manual errors and ensures consistency
+</Accordion>
+
+## SOC Design Best Practices
+
+The architecture incorporates industry best practices for Security Operations Centers:
+
+### Centralized Logging and Visibility
+
+<Card icon="database">
+  **All security-relevant events flow to a central repository** (Elasticsearch) where they can be correlated, searched, and analyzed. This centralized approach enables:
+  
+  - Cross-system correlation to detect distributed attacks
+  - Long-term forensic analysis
+  - Compliance reporting and audit trails
+  - Single source of truth for security events
+</Card>
+
+### Event Correlation and Context
+
+<Info>
+Wazuh provides correlation rules that combine events from multiple sources to detect complex attack patterns that individual alerts would miss.
+</Info>
+
+**Example Correlation Scenarios**:
+- Failed authentication attempts from IDS alerts + successful login from log data = potential brute force success
+- Vulnerability scan detected + exploit attempt + unusual process execution = active exploitation
+- Network anomaly + infrastructure performance degradation = potential DoS attack
+
+### Incident Lifecycle Management
+
+<Steps>
+  <Step title="Detection">
+    Multiple detection layers identify potential security events
+  </Step>
+  
+  <Step title="Triage">
+    Events are automatically prioritized based on severity and context
+  </Step>
+  
+  <Step title="Investigation">
+    Analysts use TheHive to track investigation progress and findings
+  </Step>
+  
+  <Step title="Response">
+    Cortex executes automated containment and remediation actions
+  </Step>
+  
+  <Step title="Recovery">
+    Infrastructure automation restores systems to known-good state
+  </Step>
+  
+  <Step title="Lessons Learned">
+    Incident data feeds continuous improvement of detection and response
+  </Step>
+</Steps>
+
+### Metrics and Continuous Improvement
+
+The architecture enables SOC metrics tracking:
+
+- **Mean Time to Detect (MTTD)**: How quickly threats are identified
+- **Mean Time to Respond (MTTR)**: How quickly incidents are contained
+- **False Positive Rate**: Accuracy of detection mechanisms
+- **Coverage**: Percentage of infrastructure with monitoring
+- **Alert Volume**: Trends in security events over time
+
+<Tip>
+Regularly review these metrics to identify opportunities for tuning detection rules, improving automation, and optimizing analyst workflows.
+</Tip>
+
+### Data Retention and Privacy
+
+<Warning>
+Balance security requirements with privacy obligations:
+- Implement data retention policies aligned with compliance requirements
+- Anonymize or pseudonymize sensitive data where possible
+- Secure access to security data with role-based access control
+- Document data handling procedures for audit purposes
+</Warning>
+
+## Adaptability and Future-Proofing
+
+The architecture is designed to evolve with changing threat landscapes:
+
+### Extensibility Points
+
+- **Custom Detection Rules**: Wazuh, Snort, and Suricata support custom rule development
+- **API Integration**: All major components expose REST APIs for integration
+- **Plugin Architecture**: Logstash, Elasticsearch, and Cortex support custom plugins
+- **Scripting**: Automation tools support custom scripts and playbooks
+
+### Long-Term Enhancements
+
+The architecture roadmap includes:
+
+<CardGroup cols={3}>
+  <Card title="Deception Technology" icon="masks-theater">
+    Honeypots-Proxmox will provide early warning of attacks and threat intelligence
+  </Card>
+  
+  <Card title="Advanced Networking" icon="shield-halved">
+    OPNsense firewall adds perimeter defense and microsegmentation capabilities
+  </Card>
+  
+  <Card title="Secure Access" icon="key">
+    Tailscale VPN enables secure remote access for SOC analysts and administrators
+  </Card>
+</CardGroup>
+
+<Note>
+These long-term components (shown in yellow in the architecture diagram) will be evaluated and implemented based on organizational maturity and specific requirements.
+</Note>
+
+## Conclusion
+
+The Enterprise SOC Architecture embodies a comprehensive approach to security operations, balancing:
+
+- **Depth of defense** with **operational efficiency**
+- **Comprehensive coverage** with **manageable complexity**
+- **Automation** with **human oversight**
+- **Open-source flexibility** with **enterprise reliability**
+
+These design principles ensure the architecture can adapt to evolving threats while maintaining operational excellence.
+
+## Next Steps
+
+For detailed information about specific components:
+- Explore the [Detection Layer](/components/detection-layer) documentation
+- Learn about [Log Aggregation](/components/log-aggregation) implementation
+- Review [Incident Response](/components/incident-response) workflows
+- Understand [Deployment](/deployment/prerequisites) requirements

@@ -1,0 +1,741 @@
+---
+title: "Threat Hunting"
+description: "Proactive threat hunting methodologies, techniques, and queries for identifying hidden threats in the SOC environment"
+---
+
+# Threat Hunting
+
+Threat hunting is the proactive practice of searching for cyber threats that have evaded traditional security controls. This guide provides methodologies, techniques, and practical queries for conducting effective threat hunting operations using Wazuh, Elasticsearch, and other SOC tools.
+
+## Threat Hunting Fundamentals
+
+<Info>
+Threat hunting is hypothesis-driven investigation. Start with a question or assumption about potential adversary behavior, then use data to prove or disprove it.
+</Info>
+
+### Threat Hunting vs. Incident Response
+
+| Aspect | Threat Hunting | Incident Response |
+|--------|---------------|-------------------|
+| **Trigger** | Proactive hypothesis | Alert or detection |
+| **Goal** | Find unknown threats | Respond to known incident |
+| **Approach** | Exploratory analysis | Structured process |
+| **Timeline** | Continuous/scheduled | Reactive/time-sensitive |
+| **Outcome** | New detections, IOCs | Remediation, containment |
+
+### The Threat Hunting Loop
+
+<Steps>
+  <Step title="Hypothesize">
+    Develop a hypothesis about potential threats:
+    - Based on threat intelligence (TTPs from recent campaigns)
+    - Inspired by security gaps or blind spots
+    - Following anomalies in baseline behavior
+    - Investigating new attack techniques
+    
+    **Example Hypotheses:**
+    - "Attackers may be using PowerShell to download and execute malware"
+    - "Lateral movement may be occurring via SMB connections"
+    - "Data exfiltration could be happening via DNS tunneling"
+  </Step>
+  
+  <Step title="Investigate">
+    Use data to test your hypothesis:
+    - Query Elasticsearch for relevant events
+    - Analyze Wazuh endpoint data
+    - Review IDS/IPS logs from Snort/Suricata
+    - Correlate events across multiple data sources
+    - Apply statistical analysis to identify outliers
+  </Step>
+  
+  <Step title="Uncover">
+    Analyze findings:
+    - Identify suspicious patterns or anomalies
+    - Distinguish between benign and malicious activity
+    - Trace attack paths and timelines
+    - Collect indicators of compromise (IOCs)
+  </Step>
+  
+  <Step title="Inform">
+    Apply lessons learned:
+    - Create new detection rules in Wazuh
+    - Update IDS/IPS signatures
+    - Document TTPs and IOCs in TheHive
+    - Share intelligence with security community
+    - Improve monitoring coverage
+    - Update threat hunting playbooks
+  </Step>
+</Steps>
+
+## Threat Hunting Methodologies
+
+<Tabs>
+  <Tab title="Intelligence-Driven">
+    ### Intelligence-Driven Hunting
+    
+    Hunt based on external threat intelligence about adversary TTPs.
+    
+    **Sources:**
+    - MITRE ATT&CK Framework
+    - Threat intelligence feeds
+    - Vendor security advisories
+    - Security research publications
+    - Information sharing communities (ISACs)
+    
+    **Process:**
+    1. Identify relevant TTPs from threat intel
+    2. Map TTPs to data sources in your environment
+    3. Develop queries to detect those TTPs
+    4. Execute hunt and analyze results
+    5. Create permanent detection rules
+    
+    **Example:**
+    Hunt for techniques from APT29 (Cozy Bear) based on recent threat report:
+    - Spearphishing attachments (T1566.001)
+    - PowerShell execution (T1059.001)
+    - Credential dumping (T1003)
+    - Lateral movement via RDP (T1021.001)
+  </Tab>
+  
+  <Tab title="Hypothesis-Driven">
+    ### Hypothesis-Driven Hunting
+    
+    Develop hypotheses based on your understanding of the environment and potential attack vectors.
+    
+    **Hypothesis Development:**
+    - Analyze your attack surface
+    - Consider security gaps in current defenses
+    - Think like an attacker
+    - Review past incidents for patterns
+    
+    **Process:**
+    1. Formulate specific, testable hypothesis
+    2. Determine required data sources
+    3. Create analysis plan
+    4. Execute queries and analysis
+    5. Document findings and create detections
+    
+    **Example Hypotheses:**
+    - "Attackers are using compromised service accounts for persistence"
+    - "Malware may be hiding in scheduled tasks"
+    - "Users may be exfiltrating data via cloud storage"
+    - "Attackers could be exploiting unpatched VPN servers"
+  </Tab>
+  
+  <Tab title="Baseline Anomaly">
+    ### Baseline Anomaly Hunting
+    
+    Establish behavioral baselines and hunt for deviations.
+    
+    **Baseline Development:**
+    - Normal authentication patterns
+    - Typical network traffic flows
+    - Standard process execution
+    - Regular file access patterns
+    - Expected administrative activity
+    
+    **Process:**
+    1. Collect historical data (30-90 days recommended)
+    2. Establish statistical baselines
+    3. Define anomaly thresholds
+    4. Monitor for deviations
+    5. Investigate significant anomalies
+    
+    **Common Anomalies:**
+    - Login times outside normal hours
+    - Unusual volume of data transfer
+    - Rare process executions
+    - Abnormal network destinations
+    - Spike in failed authentications
+  </Tab>
+  
+  <Tab title="Crown Jewel">
+    ### Crown Jewel Analysis
+    
+    Focus hunting efforts on protecting most critical assets.
+    
+    **Identify Crown Jewels:**
+    - Customer databases
+    - Intellectual property
+    - Financial systems
+    - Authentication infrastructure (AD, LDAP)
+    - Critical applications
+    
+    **Process:**
+    1. Inventory and classify critical assets
+    2. Map access paths to crown jewels
+    3. Monitor all activities related to these assets
+    4. Hunt for unauthorized access attempts
+    5. Verify all legitimate access
+    
+    **Hunt Focus:**
+    - Who accesses crown jewels and when?
+    - Are there unusual access patterns?
+    - Are proper authentication methods used?
+    - Is data being copied or exfiltrated?
+    - Are there privilege escalation attempts?
+  </Tab>
+</Tabs>
+
+## Using Wazuh for Threat Hunting
+
+### Wazuh Query Techniques
+
+Wazuh provides powerful search and filtering capabilities for endpoint data:
+
+<Accordion title="File Integrity Monitoring (FIM) Hunting">
+  Hunt for unauthorized file modifications:
+  
+  **Query: Recent changes to system directories**
+  ```
+  rule.groups: syscheck AND 
+  syscheck.path: (/bin/* OR /usr/bin/* OR /sbin/* OR C:\Windows\System32\*)
+  ```
+  
+  **Query: Suspicious file additions**
+  ```
+  rule.groups: syscheck AND 
+  syscheck.event: added AND
+  syscheck.path: (*\AppData\Roaming\* OR *\Temp\* OR */tmp/*)
+  ```
+  
+  **What to look for:**
+  - New executables in user temp directories
+  - Modifications to system binaries
+  - Changes to startup folders
+  - New files in web server directories
+</Accordion>
+
+<Accordion title="Process Execution Hunting">
+  Identify suspicious process activity:
+  
+  **Query: PowerShell with download capabilities**
+  ```
+  data.win.eventdata.commandLine: (*DownloadString* OR *DownloadFile* OR 
+  *WebClient* OR *Invoke-WebRequest* OR *IWR* OR *wget* OR *curl*)
+  ```
+  
+  **Query: Encoded PowerShell commands**
+  ```
+  data.win.eventdata.commandLine: (*-enc* OR *-encodedcommand* OR *-e *) AND
+  data.win.eventdata.image: *powershell.exe
+  ```
+  
+  **Query: Living off the Land binaries (LOLBins)**
+  ```
+  data.win.eventdata.image: (*certutil.exe* OR *bitsadmin.exe* OR 
+  *mshta.exe* OR *regsvr32.exe* OR *rundll32.exe*)
+  ```
+  
+  **What to look for:**
+  - Suspicious parent-child process relationships
+  - Execution from unusual locations
+  - Command-line obfuscation
+  - Use of system utilities for malicious purposes
+</Accordion>
+
+<Accordion title="Network Connection Hunting">
+  Investigate suspicious network activity:
+  
+  **Query: Outbound connections to rare destinations**
+  ```
+  data.win.eventdata.destinationPort: (4444 OR 8888 OR 31337 OR 1337) OR
+  data.protocol: NOT (80 OR 443 OR 22 OR 3389)
+  ```
+  
+  **Query: Internal lateral movement**
+  ```
+  data.win.eventdata.destinationPort: (445 OR 3389 OR 5985 OR 5986) AND
+  data.win.eventdata.sourceIp: 10.* OR 172.16.* OR 192.168.*
+  ```
+  
+  **What to look for:**
+  - Beaconing patterns (regular intervals)
+  - Connections to newly registered domains
+  - Large data transfers
+  - Unusual ports for common services
+</Accordion>
+
+<Accordion title="Authentication Hunting">
+  Hunt for credential compromise and abuse:
+  
+  **Query: Failed login patterns**
+  ```
+  rule.groups: authentication_failed AND
+  rule.level: >= 5
+  | stats count by user.name, source.ip
+  | where count > 10
+  ```
+  
+  **Query: Successful login after failures (potential brute force success)**
+  ```
+  rule.groups: authentication_success AND
+  rule.groups: authentication_failed
+  | transaction user.name, source.ip maxspan=30m
+  ```
+  
+  **Query: Privilege escalation events**
+  ```
+  data.win.system.eventID: (4672 OR 4673 OR 4674) AND
+  data.win.eventdata.privilegeList: *SeDebugPrivilege*
+  ```
+  
+  **What to look for:**
+  - Logins from impossible locations (geographically)
+  - Logins at unusual times
+  - Service account interactive logins
+  - Multiple account logins from single source
+</Accordion>
+
+### Wazuh API for Automated Hunting
+
+<Tip>
+Automate repetitive threat hunting queries using the Wazuh API and schedule them to run daily or weekly.
+</Tip>
+
+**Example: Find agents with suspicious processes**
+```bash
+curl -X GET "https://wazuh-manager:55000/security/user/authenticate" \
+  -u user:password
+
+curl -X GET "https://wazuh-manager:55000/syscollector/000/processes" \
+  -H "Authorization: Bearer $TOKEN" \
+  | jq '.data.affected_items[] | select(.name | contains("powershell"))'
+```
+
+## Using Elasticsearch for Threat Hunting
+
+### Advanced Elasticsearch Queries
+
+<Accordion title="DNS Tunneling Detection">
+  Detect potential DNS tunneling for data exfiltration:
+  
+  ```json
+  {
+    "query": {
+      "bool": {
+        "must": [
+          {"term": {"event.type": "dns"}},
+          {"range": {"@timestamp": {"gte": "now-24h"}}}
+        ]
+      }
+    },
+    "aggs": {
+      "by_domain": {
+        "terms": {
+          "field": "dns.question.name",
+          "size": 100,
+          "order": {"query_count": "desc"}
+        },
+        "aggs": {
+          "query_count": {"value_count": {"field": "dns.question.name"}},
+          "avg_length": {"avg": {"script": "doc['dns.question.name'].value.length()"}},
+          "unique_subdomains": {"cardinality": {"field": "dns.question.name"}}
+        }
+      }
+    }
+  }
+  ```
+  
+  **Indicators of DNS tunneling:**
+  - High query volume to single domain
+  - Unusually long subdomain names
+  - High entropy in subdomain strings
+  - Regular query intervals (beaconing)
+</Accordion>
+
+<Accordion title="Lateral Movement Detection">
+  Identify potential lateral movement across the network:
+  
+  ```json
+  {
+    "query": {
+      "bool": {
+        "must": [
+          {"terms": {"destination.port": [445, 3389, 5985, 5986]}},
+          {"term": {"event.outcome": "success"}},
+          {"range": {"@timestamp": {"gte": "now-1h"}}}
+        ]
+      }
+    },
+    "aggs": {
+      "by_source": {
+        "terms": {"field": "source.ip", "size": 50},
+        "aggs": {
+          "unique_destinations": {
+            "cardinality": {"field": "destination.ip"}
+          },
+          "destination_list": {
+            "terms": {"field": "destination.ip", "size": 100}
+          }
+        }
+      }
+    }
+  }
+  ```
+  
+  **What to investigate:**
+  - Single source connecting to many destinations
+  - Workstation-to-workstation SMB/RDP
+  - Unusual times for administrative protocols
+  - Accounts used across multiple systems
+</Accordion>
+
+<Accordion title="Data Exfiltration Detection">
+  Hunt for large or unusual data transfers:
+  
+  ```json
+  {
+    "query": {
+      "bool": {
+        "must": [
+          {"range": {"network.bytes": {"gte": 10485760}}},
+          {"term": {"network.direction": "outbound"}},
+          {"range": {"@timestamp": {"gte": "now-24h"}}}
+        ],
+        "must_not": [
+          {"terms": {"destination.domain": ["microsoft.com", "google.com", "amazonaws.com"]}}
+        ]
+      }
+    },
+    "aggs": {
+      "by_source": {
+        "terms": {"field": "source.ip"},
+        "aggs": {
+          "total_bytes": {"sum": {"field": "network.bytes"}},
+          "destinations": {"terms": {"field": "destination.ip"}}
+        }
+      }
+    }
+  }
+  ```
+  
+  **Red flags:**
+  - Large transfers outside business hours
+  - Data sent to cloud storage services
+  - Encrypted protocols to unknown destinations
+  - Transfers from database servers directly to internet
+</Accordion>
+
+<Accordion title="Persistence Mechanism Detection">
+  Search for common persistence techniques:
+  
+  ```json
+  {
+    "query": {
+      "bool": {
+        "should": [
+          {"match": {"file.path": "*\\Start Menu\\Programs\\Startup\\*"}},
+          {"match": {"file.path": "*/etc/cron*"}},
+          {"match": {"registry.path": "*\\Software\\Microsoft\\Windows\\CurrentVersion\\Run*"}},
+          {"match": {"process.name": "schtasks.exe"}},
+          {"match": {"process.name": "at.exe"}}
+        ],
+        "minimum_should_match": 1,
+        "filter": [
+          {"range": {"@timestamp": {"gte": "now-7d"}}}
+        ]
+      }
+    },
+    "sort": [{"@timestamp": {"order": "desc"}}]
+  }
+  ```
+  
+  **Common persistence locations:**
+  - Registry Run keys
+  - Startup folders
+  - Scheduled tasks
+  - Services
+  - WMI event subscriptions
+</Accordion>
+
+### Time-Based Analysis
+
+<Note>
+Many malicious activities occur outside normal business hours when detection is less likely.
+</Note>
+
+**Query: Activity outside business hours**
+```json
+{
+  "query": {
+    "bool": {
+      "must": [
+        {"range": {"@timestamp": {"gte": "now-7d"}}}
+      ],
+      "should": [
+        {"script": {
+          "script": "doc['@timestamp'].value.getHour() < 6 || doc['@timestamp'].value.getHour() > 20"
+        }},
+        {"script": {
+          "script": "doc['@timestamp'].value.getDayOfWeek() > 5"
+        }}
+      ],
+      "minimum_should_match": 1
+    }
+  }
+}
+```
+
+## Common Threat Hunting Queries and Techniques
+
+### PowerShell Abuse Detection
+
+<Warning>
+PowerShell is heavily abused by attackers for both initial access and post-exploitation. Monitor PowerShell activity closely.
+</Warning>
+
+**Hunting Techniques:**
+
+1. **Download Cradles**: Look for PowerShell downloading files
+   ```
+   commandline: ("Net.WebClient" OR "DownloadString" OR "DownloadFile" OR "Invoke-WebRequest" OR "IWR" OR "wget" OR "curl")
+   ```
+
+2. **Encoded Commands**: Base64 encoded commands to evade detection
+   ```
+   commandline: ("-enc" OR "-encodedcommand" OR "-e ") AND process.name: powershell.exe
+   ```
+
+3. **Execution Policy Bypass**: Attempts to bypass execution restrictions
+   ```
+   commandline: ("-ExecutionPolicy Bypass" OR "-ep bypass" OR "-exec bypass")
+   ```
+
+4. **Suspicious Modules**: Loading of potentially malicious modules
+   ```
+   commandline: ("Invoke-Mimikatz" OR "Invoke-Expression" OR "IEX" OR "Invoke-Shellcode" OR "Invoke-ReflectivePEInjection")
+   ```
+
+### Credential Theft Detection
+
+**LSASS Memory Dumping:**
+```
+process.name: (procdump* OR sqldumper.exe OR taskmgr.exe) AND
+process.command_line: *lsass*
+```
+
+**Mimikatz Execution:**
+```
+file.name: mimikatz.exe OR
+process.command_line: ("sekurlsa::" OR "lsadump::" OR "kerberos::")
+```
+
+**Credential Access via Registry:**
+```
+registry.path: (*\\SAM OR *\\SECURITY OR *\\SYSTEM) AND
+event.action: (query OR read)
+```
+
+### Reconnaissance Detection
+
+**Network Scanning:**
+```
+Aggregation query:
+- Count unique destination IPs per source IP
+- Filter sources with > 50 unique destinations in 5 minutes
+- Identify potential port scanning
+```
+
+**Active Directory Enumeration:**
+```
+process.name: (net.exe OR net1.exe) AND
+process.command_line: (*group* OR *user* OR *localgroup* OR *share*)
+```
+
+**DNS Enumeration:**
+```
+dns.question.type: AXFR OR
+(dns.query count > 100 per source in 1 minute)
+```
+
+## Indicators of Compromise (IOC) Management
+
+### Collecting IOCs
+
+<Steps>
+  <Step title="Extract from Investigations">
+    Collect IOCs during incident response and threat hunting:
+    - File hashes (MD5, SHA1, SHA256)
+    - IP addresses
+    - Domain names
+    - URLs
+    - Email addresses
+    - File paths
+    - Registry keys
+    - Mutex names
+    - User agents
+  </Step>
+  
+  <Step title="Document in TheHive">
+    Store IOCs as observables in TheHive cases:
+    - Tag IOCs by threat actor or campaign
+    - Set confidence levels
+    - Add context and analysis
+    - Mark for threat intelligence sharing
+  </Step>
+  
+  <Step title="Operationalize IOCs">
+    Turn IOCs into active detections:
+    - Create Wazuh CDB lists for known bad indicators
+    - Add IP blocks to firewall
+    - Update IDS/IPS signatures
+    - Configure DNS blocking
+    - Add to SIEM correlation rules
+  </Step>
+  
+  <Step title="Share Intelligence">
+    Contribute to community defense:
+    - Upload to MISP (if available)
+    - Share with industry ISACs
+    - Report to abuse contacts
+    - Contribute to open threat intel platforms
+  </Step>
+</Steps>
+
+### IOC Hunting Workflow
+
+<Tip>
+Regularly hunt for known IOCs in your historical data. Attackers may have been present before IOCs were discovered.
+</Tip>
+
+**Automated IOC Hunting:**
+
+1. **Maintain IOC Database**: Keep updated list of IOCs from threat intel
+2. **Schedule Searches**: Daily/weekly searches across Elasticsearch
+3. **Alert on Matches**: Automatic alert creation for IOC hits
+4. **Context Enrichment**: Add threat intelligence context to matches
+5. **Investigate Hits**: Determine if match is historical or active threat
+
+**Example IOC Hunt Query:**
+```json
+{
+  "query": {
+    "bool": {
+      "should": [
+        {"terms": {"source.ip": ["192.0.2.1", "198.51.100.1", "203.0.113.1"]}},
+        {"terms": {"destination.ip": ["192.0.2.1", "198.51.100.1", "203.0.113.1"]}},
+        {"terms": {"dns.question.name": ["evil.com", "malware.net", "badactor.org"]}},
+        {"terms": {"file.hash.sha256": ["abc123...", "def456...", "ghi789..."]}}
+      ],
+      "minimum_should_match": 1
+    }
+  }
+}
+```
+
+## Threat Hunting Schedule
+
+<CardGroup cols={2}>
+  <Card title="Daily Hunts" icon="calendar-day">
+    Quick focused hunts (30-60 minutes):
+    - Review anomalous authentication events
+    - Check for new persistence mechanisms
+    - Scan for unusual PowerShell activity
+    - Verify crown jewel access patterns
+  </Card>
+  
+  <Card title="Weekly Hunts" icon="calendar-week">
+    In-depth investigations (2-4 hours):
+    - Network behavior analysis
+    - Process execution pattern review
+    - Lateral movement detection
+    - Data exfiltration hunting
+  </Card>
+  
+  <Card title="Monthly Hunts" icon="calendar">
+    Comprehensive campaigns (1-2 days):
+    - Full threat actor TTP mapping
+    - Advanced persistent threat hunting
+    - Historical IOC sweeps
+    - Baseline validation and updates
+  </Card>
+  
+  <Card title="Triggered Hunts" icon="bell">
+    Based on new intelligence:
+    - New vulnerability disclosures
+    - Emerging threat campaigns
+    - Industry-specific threats
+    - Custom threat intelligence
+  </Card>
+</CardGroup>
+
+## Threat Hunting Tools and Resources
+
+### Essential Queries Library
+
+Maintain a library of proven hunting queries:
+
+- **MITRE ATT&CK Navigator**: Map queries to ATT&CK techniques
+- **Query Repository**: Git repository of Elasticsearch and Wazuh queries
+- **Playbook Documentation**: Step-by-step hunting procedures
+- **Results Database**: Historical hunt results for trend analysis
+
+### External Resources
+
+<Info>
+Leverage the security research community's collective knowledge for hunting ideas and techniques.
+</Info>
+
+**Recommended Resources:**
+- MITRE ATT&CK Framework: Comprehensive adversary tactics database
+- Cyber Kill Chain: Attack phase modeling for hunt focus
+- SIGMA Rules: Generic detection rules convertible to your SIEM
+- Threat intelligence feeds: Current IOCs and TTPs
+- Security research blogs: Latest attack techniques
+
+## Measuring Hunting Effectiveness
+
+### Key Metrics
+
+Track hunting program success:
+
+- **Threats Discovered**: Number of undetected threats found through hunting
+- **New Detections Created**: Permanent detection rules created from hunts
+- **Coverage Improvement**: ATT&CK technique coverage increase
+- **Time to Detection**: Reduction in dwell time for threats
+- **False Positive Rate**: Quality of new detection rules
+- **Hunt Frequency**: Consistency of hunting activities
+
+### Continuous Improvement
+
+<Steps>
+  <Step title="Document Findings">
+    Maintain detailed hunt logs:
+    - Hypothesis tested
+    - Queries used
+    - Results found
+    - Actions taken
+    - Lessons learned
+  </Step>
+  
+  <Step title="Create Detections">
+    Convert successful hunts to automated detection:
+    - Write Wazuh rules
+    - Update correlation logic
+    - Add IDS signatures
+    - Implement alerting
+  </Step>
+  
+  <Step title="Expand Coverage">
+    Continuously improve detection coverage:
+    - Map to MITRE ATT&CK
+    - Identify coverage gaps
+    - Prioritize hunt campaigns
+    - Test detection effectiveness
+  </Step>
+  
+  <Step title="Share Knowledge">
+    Contribute to team and community:
+    - Train other analysts on techniques
+    - Document hunting playbooks
+    - Share IOCs and TTPs
+    - Present findings in team meetings
+  </Step>
+</Steps>
+
+## Related Resources
+
+- [Monitoring Guide](/operations/monitoring-guide) - Daily monitoring operations and alert management
+- [Incident Handling](/operations/incident-handling) - Procedures for responding to discovered threats
+- [Maintenance](/operations/maintenance) - System maintenance and tuning procedures

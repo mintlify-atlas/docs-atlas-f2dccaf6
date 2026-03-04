@@ -1,0 +1,911 @@
+---
+title: "Maintenance"
+description: "Regular maintenance tasks, system tuning, and operational procedures for optimal SOC performance"
+---
+
+# Maintenance
+
+This guide covers regular maintenance tasks, system tuning, and operational procedures to ensure the Enterprise SOC infrastructure operates at peak performance. Proper maintenance prevents system degradation, maintains detection effectiveness, and ensures long-term reliability.
+
+## Maintenance Overview
+
+<Info>
+Regular maintenance is essential for SOC health. Schedule maintenance windows during low-activity periods and always have rollback procedures ready.
+</Info>
+
+<CardGroup cols={2}>
+  <Card title="Daily Tasks" icon="calendar-day">
+    Quick health checks and operational verification to ensure all systems are functioning correctly
+  </Card>
+  <Card title="Weekly Tasks" icon="calendar-week">
+    Rule updates, log review, and performance optimization for sustained effectiveness
+  </Card>
+  <Card title="Monthly Tasks" icon="calendar">
+    Deep system analysis, comprehensive updates, and capacity planning reviews
+  </Card>
+  <Card title="Quarterly Tasks" icon="calendar-days">
+    Major upgrades, disaster recovery testing, and security assessments
+  </Card>
+</CardGroup>
+
+## Regular Maintenance Tasks
+
+<Accordion title="Daily Maintenance (15-30 minutes)">
+  ### System Health Checks
+  
+  <Steps>
+    <Step title="Monitoring System Status">
+      Verify all SOC components are operational:
+      - **Wazuh**: Check manager and agent status
+        ```bash
+        /var/ossec/bin/wazuh-control status
+        /var/ossec/bin/agent_control -l
+        ```
+      - **Elasticsearch**: Verify cluster health
+        ```bash
+        curl -X GET "localhost:9200/_cluster/health?pretty"
+        ```
+      - **Logstash/Fluentd**: Check pipeline status and throughput
+      - **Zabbix**: Verify server and agent connectivity
+      - **Prometheus**: Check target health and scrape status
+      - **TheHive**: Confirm platform accessibility and background jobs
+    </Step>
+    
+    <Step title="Agent Connectivity">
+      Review disconnected agents:
+      - Identify offline Wazuh agents
+      - Check for network connectivity issues
+      - Verify agent services are running
+      - Document persistent offline agents
+      - Escalate critical system outages
+    </Step>
+    
+    <Step title="Log Ingestion Verification">
+      Confirm logs are being received:
+      - Check Logstash/Fluentd event rates
+      - Verify events appearing in Elasticsearch
+      - Review pipeline errors and failed events
+      - Monitor queue depths and backlogs
+      - Identify silent log sources
+    </Step>
+    
+    <Step title="Alert Pipeline Health">
+      Ensure alerting is functioning:
+      - Verify recent alerts in Wazuh
+      - Check TheHive integration status
+      - Test notification channels (email, Slack, etc.)
+      - Review alert delivery times
+    </Step>
+    
+    <Step title="Storage Monitoring">
+      Check disk space on all systems:
+      - Elasticsearch data nodes (alert at 75% usage)
+      - Wazuh manager log storage
+      - Backup storage capacity
+      - Database storage
+      - Archive retention
+    </Step>
+  </Steps>
+  
+  ### Quick Performance Check
+  
+  - **Query Response Times**: Test dashboard load times (should be < 5 seconds)
+  - **Indexing Rate**: Verify Elasticsearch indexing keeps pace with ingestion
+  - **CPU/Memory**: Check for resource exhaustion on critical systems
+  - **Network Throughput**: Monitor bandwidth utilization
+</Accordion>
+
+<Accordion title="Weekly Maintenance (2-4 hours)">
+  ### Rule and Signature Updates
+  
+  <Steps>
+    <Step title="IDS/IPS Rule Updates">
+      Update Snort and Suricata signatures:
+      
+      **Snort:**
+      ```bash
+      # Pull latest rules from source
+      pulledpork.pl -c /etc/snort/pulledpork.conf
+      
+      # Test configuration
+      snort -T -c /etc/snort/snort.conf
+      
+      # Restart Snort
+      systemctl restart snort
+      ```
+      
+      **Suricata:**
+      ```bash
+      # Update rules using suricata-update
+      suricata-update
+      
+      # Reload rules without restart
+      kill -USR2 $(pidof suricata)
+      ```
+      
+      **Post-Update:**
+      - Review new rules added
+      - Monitor for new false positives
+      - Document any rule suppressions needed
+    </Step>
+    
+    <Step title="Wazuh Rule Updates">
+      Update Wazuh detection rules:
+      
+      ```bash
+      # Backup current rules
+      cp -r /var/ossec/ruleset/rules /var/ossec/ruleset/rules.backup.$(date +%F)
+      
+      # Update Wazuh ruleset
+      /var/ossec/bin/update_ruleset
+      
+      # Test configuration
+      /var/ossec/bin/wazuh-logtest
+      
+      # Restart Wazuh manager
+      systemctl restart wazuh-manager
+      ```
+      
+      Review custom rules in `/var/ossec/etc/rules/local_rules.xml` for compatibility
+    </Step>
+    
+    <Step title="Threat Intelligence Updates">
+      Refresh threat intelligence feeds:
+      - Update IOC databases
+      - Import new MISP events (if using MISP)
+      - Update IP reputation lists
+      - Refresh malware hash databases
+      - Update domain blocklists
+      - Sync with industry threat feeds
+    </Step>
+    
+    <Step title="False Positive Review">
+      Tune detection rules:
+      - Review top noisy alerts from past week
+      - Create suppression rules for confirmed false positives
+      - Adjust alert severity levels
+      - Update correlation thresholds
+      - Document tuning decisions
+      
+      **Example Wazuh suppression:**
+      ```xml
+      <!-- In /var/ossec/etc/ossec.conf -->
+      <ossec_config>
+        <alerts>
+          <log_alert_level>3</log_alert_level>
+        </alerts>
+        <rules>
+          <include>local_rules.xml</include>
+        </rules>
+      </ossec_config>
+      ```
+    </Step>
+    
+    <Step title="Vulnerability Management">
+      Review and prioritize vulnerabilities:
+      - Check for new CVEs affecting SOC infrastructure
+      - Review Wazuh vulnerability detection results
+      - Prioritize patching based on risk
+      - Schedule patch deployment
+      - Verify patch application
+    </Step>
+  </Steps>
+  
+  ### Performance Optimization
+  
+  - **Elasticsearch Index Optimization**:
+    ```bash
+    # Force merge old indices
+    curl -X POST "localhost:9200/wazuh-alerts-*/_forcemerge?max_num_segments=1"
+    ```
+  
+  - **Clear old logs and temporary files**
+  - **Review slow query logs**
+  - **Optimize heavy dashboard queries**
+  - **Check for index bloat**
+</Accordion>
+
+<Accordion title="Monthly Maintenance (4-8 hours)">
+  ### Comprehensive System Review
+  
+  <Steps>
+    <Step title="Security Updates and Patching">
+      Apply system updates:
+      
+      **Operating System Updates:**
+      ```bash
+      # Ubuntu/Debian
+      apt update && apt upgrade -y
+      
+      # CentOS/RHEL
+      yum update -y
+      ```
+      
+      **SOC Component Updates:**
+      - Wazuh manager and agents
+      - Elasticsearch cluster
+      - Logstash/Fluentd
+      - TheHive and Cortex
+      - Zabbix server and agents
+      - Prometheus and exporters
+      
+      <Warning>
+      Test updates in staging environment before production deployment. Always have rollback plan ready.
+      </Warning>
+    </Step>
+    
+    <Step title="Log Retention and Cleanup">
+      Manage log data lifecycle:
+      
+      **Elasticsearch Index Management:**
+      ```bash
+      # Delete indices older than 90 days
+      curator_cli --host localhost delete_indices --filter_list \
+        '[{"filtertype":"age","source":"name","timestring":"%Y.%m.%d","unit":"days","unit_count":90}]'
+      
+      # Close indices older than 30 days (keep but not searchable)
+      curator_cli --host localhost close --filter_list \
+        '[{"filtertype":"age","source":"name","timestring":"%Y.%m.%d","unit":"days","unit_count":30}]'
+      ```
+      
+      **Archive old data:**
+      - Snapshot indices to long-term storage
+      - Compress archived logs
+      - Verify archive integrity
+      - Update retention documentation
+    </Step>
+    
+    <Step title="Capacity Planning Review">
+      Analyze resource usage trends:
+      - Review storage growth rate
+      - Project future capacity needs (3-6 months)
+      - Analyze CPU and memory trends
+      - Review network bandwidth utilization
+      - Identify resource bottlenecks
+      - Plan infrastructure upgrades
+      
+      **Key Metrics:**
+      - Events per second (EPS) trend
+      - Storage growth (GB per day)
+      - Query performance trends
+      - Agent count growth
+    </Step>
+    
+    <Step title="Access Review">
+      Audit user access and permissions:
+      - Review active user accounts
+      - Verify role assignments
+      - Remove inactive accounts
+      - Audit privileged access
+      - Review API key usage
+      - Update access documentation
+      
+      **Systems to review:**
+      - Wazuh dashboard access
+      - Elasticsearch users
+      - TheHive user accounts
+      - System SSH access
+      - Service accounts
+    </Step>
+    
+    <Step title="Detection Effectiveness Review">
+      Evaluate detection coverage:
+      - Map detections to MITRE ATT&CK framework
+      - Identify coverage gaps
+      - Review detection rule effectiveness
+      - Analyze false positive rates
+      - Update detection priorities
+      - Document coverage improvements
+    </Step>
+    
+    <Step title="Integration Testing">
+      Verify integrations are functioning:
+      - Test Wazuh → TheHive alert creation
+      - Verify Cortex analyzer connectivity
+      - Test IDS → Logstash → Elasticsearch pipeline
+      - Confirm Prometheus → Alertmanager flow
+      - Validate email/Slack notifications
+      - Check firewall log ingestion
+    </Step>
+  </Steps>
+  
+  ### Documentation Updates
+  
+  - Update runbooks with new procedures
+  - Document configuration changes
+  - Refresh architecture diagrams
+  - Update contact lists
+  - Review and update incident playbooks
+</Accordion>
+
+<Accordion title="Quarterly Maintenance (1-2 days)">
+  ### Major Updates and Testing
+  
+  <Steps>
+    <Step title="Major Version Upgrades">
+      Plan and execute major upgrades:
+      - Review release notes for breaking changes
+      - Test upgrades in staging environment
+      - Backup all configurations and data
+      - Schedule maintenance window
+      - Execute upgrade following vendor procedures
+      - Validate functionality post-upgrade
+      - Update documentation
+      
+      **Upgrade Priority:**
+      1. Security patches (immediate)
+      2. Critical bug fixes (within 1 month)
+      3. Feature updates (quarterly)
+    </Step>
+    
+    <Step title="Disaster Recovery Testing">
+      Validate backup and recovery procedures:
+      - Test restore from backups
+      - Verify backup completeness
+      - Practice failover procedures
+      - Test DR site readiness (if applicable)
+      - Document recovery times (RTO/RPO)
+      - Update DR documentation
+      - Train staff on DR procedures
+      
+      <Note>
+      Disaster recovery testing is critical. Untested backups are not backups.
+      </Note>
+    </Step>
+    
+    <Step title="Security Assessment">
+      Conduct security review of SOC infrastructure:
+      - Vulnerability scan all SOC systems
+      - Review security configurations
+      - Audit authentication mechanisms
+      - Test network segmentation
+      - Review firewall rules
+      - Assess encryption in transit and at rest
+      - Penetration test SOC components (optional)
+    </Step>
+    
+    <Step title="Performance Benchmarking">
+      Establish performance baselines:
+      - Measure query response times
+      - Benchmark indexing rates
+      - Test maximum EPS capacity
+      - Measure alert processing latency
+      - Document baseline metrics
+      - Compare against previous quarters
+      - Identify performance degradation
+    </Step>
+    
+    <Step title="Compliance Review">
+      Verify regulatory compliance:
+      - Review audit logs for completeness
+      - Verify log retention meets requirements
+      - Confirm encryption standards
+      - Validate access controls
+      - Review incident documentation
+      - Generate compliance reports
+      - Address any findings
+    </Step>
+  </Steps>
+  
+  ### Strategic Planning
+  
+  - Review SOC metrics and KPIs
+  - Assess team training needs
+  - Plan infrastructure improvements
+  - Budget for upcoming year
+  - Evaluate new technologies
+  - Update SOC roadmap
+</Accordion>
+
+## Log Retention and Cleanup
+
+### Retention Policy Guidelines
+
+<CardGroup cols={2}>
+  <Card title="Hot Storage" icon="fire">
+    **30 days** - Full search and analysis
+    
+    All logs immediately searchable in Elasticsearch with full indexing
+  </Card>
+  <Card title="Warm Storage" icon="temperature-half">
+    **31-90 days** - Reduced access
+    
+    Closed indices, available for search but slower performance
+  </Card>
+  <Card title="Cold Storage" icon="snowflake">
+    **91-365 days** - Archive storage
+    
+    Snapshots stored on cheaper storage, restore required for access
+  </Card>
+  <Card title="Frozen/Compliance" icon="box-archive">
+    **1-7 years** - Compliance retention
+    
+    Compressed archives for regulatory compliance, rarely accessed
+  </Card>
+</CardGroup>
+
+### Elasticsearch Index Lifecycle Management
+
+<Tip>
+Use Elasticsearch Index Lifecycle Management (ILM) to automate index transitions through lifecycle phases.
+</Tip>
+
+**Example ILM Policy:**
+
+```json
+{
+  "policy": {
+    "phases": {
+      "hot": {
+        "actions": {
+          "rollover": {
+            "max_size": "50GB",
+            "max_age": "1d"
+          }
+        }
+      },
+      "warm": {
+        "min_age": "30d",
+        "actions": {
+          "forcemerge": {"max_num_segments": 1},
+          "shrink": {"number_of_shards": 1}
+        }
+      },
+      "cold": {
+        "min_age": "90d",
+        "actions": {
+          "freeze": {}
+        }
+      },
+      "delete": {
+        "min_age": "365d",
+        "actions": {
+          "delete": {}
+        }
+      }
+    }
+  }
+}
+```
+
+### Wazuh Log Management
+
+**Archive old Wazuh logs:**
+
+```bash
+# Compress logs older than 30 days
+find /var/ossec/logs/archives -name "*.log" -mtime +30 -exec gzip {} \;
+
+# Move compressed archives to cold storage
+find /var/ossec/logs/archives -name "*.gz" -mtime +90 -exec mv {} /mnt/cold-storage/wazuh/ \;
+
+# Delete archives older than retention policy
+find /mnt/cold-storage/wazuh -name "*.gz" -mtime +365 -delete
+```
+
+## Performance Tuning
+
+### Elasticsearch Optimization
+
+<Accordion title="Cluster Performance">
+  **Index Settings Optimization:**
+  
+  ```json
+  {
+    "index": {
+      "number_of_shards": 1,
+      "number_of_replicas": 1,
+      "refresh_interval": "30s",
+      "codec": "best_compression"
+    }
+  }
+  ```
+  
+  **Best Practices:**
+  - Use time-based indices (daily or weekly rollover)
+  - Set appropriate shard count (aim for 20-50GB per shard)
+  - Increase refresh interval for write-heavy indices
+  - Enable compression for older indices
+  - Disable replicas during bulk indexing
+  - Use index templates for consistent settings
+</Accordion>
+
+<Accordion title="Query Optimization">
+  **Slow Query Analysis:**
+  
+  ```bash
+  # Enable slow query logging
+  curl -X PUT "localhost:9200/_cluster/settings" -H 'Content-Type: application/json' -d'
+  {
+    "transient": {
+      "logger.index.search.slowlog": "DEBUG",
+      "logger.index.indexing.slowlog": "DEBUG"
+    }
+  }'
+  ```
+  
+  **Optimization Techniques:**
+  - Use filter context instead of query context when possible
+  - Limit result size and use pagination
+  - Avoid wildcard queries on large fields
+  - Use index patterns to limit search scope
+  - Cache frequently used aggregations
+  - Optimize field mappings (use keyword for exact match)
+</Accordion>
+
+<Accordion title="Hardware and JVM Tuning">
+  **JVM Heap Size:**
+  
+  ```bash
+  # In /etc/elasticsearch/jvm.options
+  # Set heap to 50% of available RAM, max 32GB
+  -Xms16g
+  -Xmx16g
+  ```
+  
+  **Best Practices:**
+  - Set min and max heap size equal
+  - Never exceed 32GB heap size
+  - Allocate 50% of RAM to heap, leave 50% for filesystem cache
+  - Use SSD storage for data directories
+  - Ensure adequate CPU cores (2+ per node)
+  - Monitor GC pauses (should be < 1 second)
+</Accordion>
+
+### Wazuh Performance Tuning
+
+**Increase concurrent agent connections:**
+
+```xml
+<!-- In /var/ossec/etc/ossec.conf -->
+<ossec_config>
+  <remote>
+    <connection>secure</connection>
+    <port>1514</port>
+    <protocol>tcp</protocol>
+    <queue_size>131072</queue_size>
+  </remote>
+  
+  <global>
+    <logall>no</logall>
+    <logall_json>no</logall_json>
+    <email_notification>yes</email_notification>
+  </global>
+</ossec_config>
+```
+
+**Agent buffer optimization:**
+
+```xml
+<!-- In agent ossec.conf -->
+<client_buffer>
+  <disabled>no</disabled>
+  <queue_size>5000</queue_size>
+  <events_per_second>500</events_per_second>
+</client_buffer>
+```
+
+### Logstash/Fluentd Pipeline Tuning
+
+**Logstash pipeline workers:**
+
+```yaml
+# In /etc/logstash/logstash.yml
+pipeline.workers: 4
+pipeline.batch.size: 250
+pipeline.batch.delay: 50
+queue.type: persisted
+queue.max_bytes: 1gb
+```
+
+## Backup and Disaster Recovery
+
+### Backup Strategy
+
+<Steps>
+  <Step title="Identify Critical Data">
+    **What to backup:**
+    - Elasticsearch indices (snapshots)
+    - Wazuh manager configuration and rules
+    - TheHive case database
+    - Custom detection rules and scripts
+    - System configurations
+    - SSL certificates and keys
+    - User and access control data
+  </Step>
+  
+  <Step title="Implement Backup Automation">
+    **Elasticsearch Snapshots:**
+    
+    ```bash
+    # Create snapshot repository
+    curl -X PUT "localhost:9200/_snapshot/backup_repository" -H 'Content-Type: application/json' -d'
+    {
+      "type": "fs",
+      "settings": {
+        "location": "/mnt/backup/elasticsearch",
+        "compress": true
+      }
+    }'
+    
+    # Create snapshot (automated via cron)
+    curl -X PUT "localhost:9200/_snapshot/backup_repository/snapshot_$(date +%F)" -H 'Content-Type: application/json' -d'
+    {
+      "indices": "wazuh-*,suricata-*,snort-*",
+      "ignore_unavailable": true,
+      "include_global_state": false
+    }'
+    ```
+    
+    **Wazuh Configuration Backup:**
+    
+    ```bash
+    #!/bin/bash
+    # Daily Wazuh backup script
+    BACKUP_DIR="/mnt/backup/wazuh/$(date +%F)"
+    mkdir -p $BACKUP_DIR
+    
+    # Backup configurations
+    tar -czf $BACKUP_DIR/wazuh-config.tar.gz /var/ossec/etc/
+    
+    # Backup rules
+    tar -czf $BACKUP_DIR/wazuh-rules.tar.gz /var/ossec/ruleset/
+    
+    # Backup agent keys
+    cp /var/ossec/etc/client.keys $BACKUP_DIR/
+    ```
+  </Step>
+  
+  <Step title="Offsite Backup">
+    **Replicate to offsite location:**
+    - Cloud storage (S3, Azure Blob, Google Cloud Storage)
+    - Secondary datacenter
+    - Tape backup for long-term retention
+    - Encrypted backup transfer
+    - Verify backup integrity after transfer
+  </Step>
+  
+  <Step title="Backup Testing">
+    **Quarterly restore tests:**
+    - Restore Elasticsearch snapshot to test cluster
+    - Restore Wazuh configuration to test manager
+    - Verify data completeness and integrity
+    - Document restore procedures and timing
+    - Update DR documentation with findings
+  </Step>
+</Steps>
+
+### Disaster Recovery Procedures
+
+<Warning>
+Disaster recovery procedures must be tested regularly. Plan for complete SOC failure and practice recovery.
+</Warning>
+
+**Recovery Priority:**
+
+1. **Critical (RTO: 4 hours)**
+   - Wazuh manager (detection and alerting)
+   - Elasticsearch cluster (log search)
+   - TheHive (incident management)
+
+2. **High (RTO: 8 hours)**
+   - IDS/IPS systems (Snort/Suricata)
+   - Log ingestion pipeline (Logstash/Fluentd)
+   - Prometheus monitoring
+
+3. **Medium (RTO: 24 hours)**
+   - Zabbix infrastructure monitoring
+   - Historical data restore
+   - Dashboard customizations
+
+**Recovery Procedures:**
+
+<Steps>
+  <Step title="Assess Damage">
+    - Determine scope of failure
+    - Identify affected systems
+    - Estimate recovery time
+    - Activate incident response team
+    - Notify stakeholders
+  </Step>
+  
+  <Step title="Restore Core Systems">
+    - Deploy fresh OS on replacement hardware
+    - Restore system configurations from backup
+    - Restore application data
+    - Verify system functionality
+    - Re-establish network connectivity
+  </Step>
+  
+  <Step title="Restore Data">
+    - Restore Elasticsearch snapshots
+    - Import Wazuh agent keys
+    - Restore TheHive case database
+    - Verify data integrity
+    - Resume log ingestion
+  </Step>
+  
+  <Step title="Validate and Resume">
+    - Test all integrations
+    - Verify alerting functions
+    - Reconnect agents
+    - Resume normal operations
+    - Document recovery process and timing
+  </Step>
+</Steps>
+
+## Compliance and Auditing
+
+### Audit Log Management
+
+<Note>
+Maintain comprehensive audit logs for security operations, system changes, and access to comply with regulations.
+</Note>
+
+**What to Audit:**
+
+- User authentication and authorization
+- Configuration changes
+- Rule modifications
+- Incident access and modifications
+- Data exports and queries
+- System administrative actions
+- Backup and restore operations
+
+**Elasticsearch Audit Logging:**
+
+```yaml
+# In elasticsearch.yml
+xpack.security.audit.enabled: true
+xpack.security.audit.logfile.events.include:
+  - access_granted
+  - access_denied
+  - authentication_failed
+  - authentication_success
+  - connection_denied
+  - connection_granted
+```
+
+### Compliance Reporting
+
+Generate regular compliance reports:
+
+- **Log retention compliance**: Verify retention periods met
+- **Access reviews**: Document user access audits
+- **Incident response**: Timeline and actions for all incidents
+- **System availability**: Uptime and SLA metrics
+- **Vulnerability management**: Patching compliance
+- **Change management**: Documentation of all changes
+
+## Maintenance Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Document Everything" icon="file-lines">
+    Maintain detailed documentation of:
+    - Maintenance procedures
+    - Configuration changes
+    - Troubleshooting steps
+    - Lessons learned
+  </Card>
+  
+  <Card title="Test Before Deploying" icon="vial">
+    Always test changes in staging:
+    - New rules and signatures
+    - Software updates
+    - Configuration modifications
+    - Integration changes
+  </Card>
+  
+  <Card title="Maintain Rollback Plans" icon="clock-rotate-left">
+    Have rollback procedures for:
+    - Configuration changes
+    - Software upgrades
+    - Rule deployments
+    - Infrastructure changes
+  </Card>
+  
+  <Card title="Monitor After Changes" icon="heart-pulse">
+    Enhanced monitoring post-maintenance:
+    - Watch for new errors
+    - Monitor performance metrics
+    - Review alert volume
+    - Validate functionality
+  </Card>
+</CardGroup>
+
+### Change Management Process
+
+<Steps>
+  <Step title="Plan the Change">
+    - Document what will change and why
+    - Identify affected systems
+    - Assess risk and impact
+    - Schedule maintenance window
+    - Prepare rollback plan
+  </Step>
+  
+  <Step title="Communicate">
+    - Notify stakeholders of maintenance window
+    - Inform SOC team of expected changes
+    - Update status pages
+    - Set expectations for downtime
+  </Step>
+  
+  <Step title="Execute Change">
+    - Follow documented procedure
+    - Take before snapshots/backups
+    - Make changes incrementally
+    - Test at each step
+    - Document actual changes made
+  </Step>
+  
+  <Step title="Validate">
+    - Test all affected functionality
+    - Verify integrations
+    - Check performance metrics
+    - Review logs for errors
+    - Confirm with stakeholders
+  </Step>
+  
+  <Step title="Document">
+    - Record changes made
+    - Note any issues encountered
+    - Update configuration documentation
+    - Share lessons learned
+    - Close change ticket
+  </Step>
+</Steps>
+
+### Maintenance Windows
+
+**Recommended Schedule:**
+
+- **Emergency Patches**: As needed (security critical)
+- **Routine Updates**: Weekly, Tuesday 2-4 AM
+- **Major Changes**: Monthly, first Sunday 12-6 AM
+- **DR Testing**: Quarterly, scheduled 3 months in advance
+
+<Tip>
+Schedule maintenance during lowest traffic periods based on your organization's patterns. Review metrics to identify optimal windows.
+</Tip>
+
+## Troubleshooting Common Issues
+
+### High Resource Usage
+
+**Symptoms**: CPU, memory, or disk at capacity
+
+**Solutions**:
+- Identify resource-intensive processes
+- Optimize heavy queries
+- Increase refresh intervals
+- Archive or delete old data
+- Scale horizontally (add nodes)
+
+### Agent Connectivity Issues
+
+**Symptoms**: Agents showing as disconnected
+
+**Solutions**:
+- Verify network connectivity
+- Check firewall rules (port 1514 for Wazuh)
+- Restart agent service
+- Re-key agent if authentication fails
+- Check manager capacity
+
+### Slow Query Performance
+
+**Symptoms**: Dashboards loading slowly
+
+**Solutions**:
+- Review slow query logs
+- Optimize query filters
+- Reduce time range
+- Add indices to filtering fields
+- Increase cluster resources
+
+## Related Resources
+
+- [Monitoring Guide](/operations/monitoring-guide) - Daily monitoring operations and alert management
+- [Incident Handling](/operations/incident-handling) - Procedures for responding to security incidents
+- [Threat Hunting](/operations/threat-hunting) - Proactive threat detection techniques

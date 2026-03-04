@@ -1,0 +1,216 @@
+---
+title: Architecture Overview
+description: High-level overview of the Enterprise SOC Architecture, including component layers, data flows, and system integration
+---
+
+# Architecture Overview
+
+The Enterprise SOC Architecture is designed as a multi-layered system where each layer provides specific security capabilities. This overview explains the architectural structure, component integration, and data flows that enable comprehensive security operations.
+
+## Architecture Diagram
+
+<img src="/images/Diagrama-SOC.png" alt="Enterprise SOC Architecture Diagram" />
+
+<Note>
+Components highlighted in **yellow** represent long-term planned features that will be implemented in future phases.
+</Note>
+
+## Architectural Layers
+
+The SOC architecture is organized into distinct functional layers that work together to provide end-to-end security operations:
+
+<CardGroup cols={2}>
+  <Card title="Detection Layer" icon="radar">
+    Network-based intrusion detection and prevention systems that monitor traffic from endpoints
+    - Snort IDS (rule-based detection)
+    - Suricata IDS/IPS (high-performance detection)
+  </Card>
+  
+  <Card title="Aggregation Layer" icon="filter">
+    Log collection and processing pipeline for normalizing and enriching security events
+    - Logstash/Fluentd (log aggregation)
+    - Elasticsearch (event storage and search)
+  </Card>
+  
+  <Card title="Monitoring Layer" icon="chart-line">
+    Infrastructure and application monitoring for availability, performance, and metrics
+    - Zabbix (infrastructure monitoring)
+    - Prometheus (metrics and alerts)
+  </Card>
+  
+  <Card title="Security Platform" icon="shield">
+    Unified security platform for visualization, correlation, and endpoint protection
+    - Wazuh (SIEM/XDR capabilities)
+  </Card>
+  
+  <Card title="Incident Management" icon="ticket">
+    Security incident tracking, investigation, and case management
+    - TheHive (incident response platform)
+  </Card>
+  
+  <Card title="Orchestration Layer" icon="diagram-project">
+    Automated response and infrastructure management
+    - Cortex (SOAR)
+    - Terraform/PyInfra (Infrastructure as Code)
+  </Card>
+</CardGroup>
+
+## Data Flow Architecture
+
+The architecture implements three primary data flows that ensure comprehensive security visibility:
+
+<Steps>
+  <Step title="Network Security Flow">
+    **Endpoints → IDS (Snort/Suricata) → Logstash → Elasticsearch → Wazuh**
+    
+    Network traffic from endpoints is analyzed by intrusion detection systems. Detected events are sent to the log aggregation pipeline, stored in Elasticsearch, and visualized in Wazuh for correlation and analysis.
+  </Step>
+  
+  <Step title="Infrastructure Monitoring Flow">
+    **Endpoints → Firewall → Zabbix → Prometheus → Wazuh**
+    
+    Infrastructure health and performance metrics flow through monitoring systems. Zabbix tracks availability and performance, Prometheus provides real-time metrics and alerting, and all data is integrated into Wazuh for unified visibility.
+  </Step>
+  
+  <Step title="Incident Response Flow">
+    **Wazuh → TheHive → Cortex**
+    
+    Security events identified in Wazuh trigger incident tickets in TheHive. Cortex orchestrates automated response actions based on predefined playbooks, enabling rapid containment and remediation.
+  </Step>
+  
+  <Step title="Future Integration Flow">
+    **Honeypots/VPN → Logstash/Wazuh** _(Long-term plan)_
+    
+    Planned integration of deception technology and secure remote access with the core security platform.
+  </Step>
+</Steps>
+
+## Layer Deep Dive
+
+### Detection Layer: IDS/IPS
+
+The first line of defense monitors network traffic for malicious activity:
+
+<Accordion title="Snort - Rule-Based Detection">
+  Snort provides lightweight, signature-based intrusion detection. It uses a comprehensive rule set to identify known attack patterns and suspicious network behavior.
+  
+  **Key Capabilities**:
+  - Real-time traffic analysis
+  - Protocol analysis
+  - Content searching/matching
+  - Packet logging
+</Accordion>
+
+<Accordion title="Suricata - High-Performance IDS/IPS">
+  Suricata offers advanced detection capabilities with multi-threading support for high-performance environments.
+  
+  **Key Capabilities**:
+  - Multi-threaded processing
+  - IDS and IPS modes
+  - File extraction and analysis
+  - Lua scripting support
+  - TLS/SSL inspection
+</Accordion>
+
+### Aggregation and Storage
+
+Centralized log collection and storage enable correlation and forensic analysis:
+
+<Info>
+**Logstash/Fluentd** act as the data pipeline, ingesting logs from multiple sources, parsing and normalizing data, and enriching events with additional context before forwarding to storage.
+</Info>
+
+<Info>
+**Elasticsearch** provides the scalable storage backend with powerful search and analytics capabilities, enabling rapid queries across millions of security events.
+</Info>
+
+### Infrastructure Monitoring
+
+Comprehensive monitoring ensures security events are correlated with infrastructure health:
+
+- **Zabbix**: Monitors server availability, resource utilization, and application performance. Provides alerting for infrastructure anomalies that may indicate security issues.
+- **Prometheus**: Collects time-series metrics with a flexible query language, enabling real-time alerting and integration with visualization tools.
+
+### Central Security Platform: Wazuh
+
+Wazuh serves as the unified security platform, providing:
+
+<CardGroup cols={2}>
+  <Card title="Event Visualization" icon="chart-mixed">
+    Customizable dashboards for real-time security event monitoring
+  </Card>
+  <Card title="Event Correlation" icon="link">
+    Intelligent correlation rules to detect complex attack patterns
+  </Card>
+  <Card title="EDR Capabilities" icon="desktop">
+    Endpoint detection and response for host-based security
+  </Card>
+  <Card title="Compliance Reporting" icon="file-contract">
+    Built-in compliance frameworks and reporting
+  </Card>
+</CardGroup>
+
+### Incident Management and Orchestration
+
+The incident response layer enables efficient security operations:
+
+<Accordion title="TheHive - Incident Response Platform">
+  TheHive provides collaborative incident management with case tracking, task assignment, and investigation workflows. Security analysts can document findings, share intelligence, and track incident resolution.
+</Accordion>
+
+<Accordion title="Cortex - SOAR Platform">
+  Cortex automates repetitive security tasks through analyzers and responders. It can automatically enrich indicators, execute response actions, and integrate with external threat intelligence sources.
+</Accordion>
+
+<Accordion title="Terraform/PyInfra - Infrastructure Automation">
+  Infrastructure as Code tools enable automated deployment, configuration management, and response actions at the infrastructure level, ensuring consistent and repeatable security controls.
+</Accordion>
+
+## Long-Term Planned Components
+
+The following components are planned for future implementation and are shown in **yellow** in the architecture diagram:
+
+<Warning>
+These components represent the long-term vision and are subject to evaluation before implementation.
+</Warning>
+
+<CardGroup cols={3}>
+  <Card title="Honeypots-Proxmox" icon="spider-web">
+    Virtualized deception technology to attract attackers and gather intelligence on tactics and techniques
+  </Card>
+  
+  <Card title="OPNsense Firewall" icon="fire">
+    Open-source perimeter firewall for network segmentation, traffic filtering, and additional intrusion prevention
+  </Card>
+  
+  <Card title="Tailscale VPN" icon="network-wired">
+    Mesh VPN solution for secure remote access to the SOC infrastructure and management interfaces
+  </Card>
+</CardGroup>
+
+## Integration Points
+
+The architecture emphasizes seamless integration between components:
+
+- **Bidirectional data flow** between monitoring and security platforms
+- **Standardized log formats** for consistent parsing and correlation
+- **API-based integration** for automated orchestration
+- **Centralized authentication** (where applicable)
+- **Unified alerting** through the Wazuh platform
+
+<Tip>
+The modular design allows components to be deployed incrementally, starting with core detection and monitoring capabilities and expanding to advanced orchestration and automation.
+</Tip>
+
+## Scalability Considerations
+
+The architecture is designed to scale across multiple dimensions:
+
+- **Horizontal scaling**: Add more IDS sensors, log processors, and storage nodes
+- **Vertical scaling**: Increase resources for compute-intensive components like Elasticsearch
+- **Geographic distribution**: Deploy regional sensors with centralized management
+- **Data retention**: Configure tiered storage for cost-effective long-term retention
+
+## Next Steps
+
+To understand the design philosophy behind this architecture, continue to the [Design Principles](/design-principles) section. For detailed information about specific components, explore the Components section of the documentation.
